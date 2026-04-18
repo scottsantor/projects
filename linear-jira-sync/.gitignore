@@ -1,23 +1,4 @@
-# Dependencies
 node_modules/
-
-# Build output
 build/
-dist/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS
 .DS_Store
-Thumbs.db
-
-# Logs
 *.log
-
-# Environment
-.env
-.env.local
