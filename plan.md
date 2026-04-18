@@ -181,7 +181,8 @@ The Activity Log tab shows a history of all actions taken through the app, store
 
 ### Linear Project Lookup
 - The `projects(filter: { slugId: ... })` GraphQL query returns 400 through the G2 proxy.
-- Instead, paginate through `projects(first: 100)` and match the slug ID from the URL (the URL slug like `cash-app-project-phone-plan-launch-2422862cf293` ends with Linear's short `slugId` like `2422862cf293`).
+- Paginating through `projects(first: 100)` is too slow — there are 250+ projects and pagination may not find the target.
+- Use `searchProjects(term: "...")` instead — convert the URL slug to a search term by removing the trailing hash and replacing hyphens with spaces (e.g. `afterpay-support-migration-data-and-reporting-transition-plan-1e31dca079bc` → `"afterpay support migration data and reporting transition plan"`), then match the result by slugId suffix. This finds the project in one query.
 
 ### Reference
 - Confirmed working patterns by inspecting the `portfolio-coverage` G2 app (`https://g2.sqprod.co/apps/portfolio-coverage`).

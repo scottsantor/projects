@@ -133,53 +133,50 @@ export function SyncUpdates({ mappings, onMappingsChange }: Props) {
       for (const pair of pairs) {
         if (pair.isProject) {
           // --- PROJECT: fetch project updates + all issue statuses/comments ---
-          // Extract the short slugId from the URL slug (last segment after final hyphen that looks like a hash)
+          // Extract the short slugId and a search term from the URL slug
           const slugParts = pair.linearIdentifier.match(/([a-f0-9]{12})$/)
           const shortSlugId = slugParts ? slugParts[1] : pair.linearIdentifier
+          // Turn "afterpay-support-migration-data-and-reporting-transition-plan-1e31dca079bc" into search terms
+          const searchTerm = pair.linearIdentifier
+            .replace(/-[a-f0-9]{12}$/, '') // remove trailing hash
+            .replace(/-/g, ' ')            // hyphens to spaces
+            .slice(0, 60)                  // limit length
 
-          // Paginate through all projects to find the matching one
+          console.log(`[LJS] Searching projects with term: "${searchTerm}", slugId: ${shortSlugId}`)
+
+          // Use searchProjects to find the project (much faster than paginating all projects)
           let matchedProjectId: string | null = null
           let matchedProjectName: string | null = null
-          let cursor: string | null = null
-          let found = false
 
-          while (!found) {
-            const afterClause = cursor ? `, after: "${cursor}"` : ''
-            const searchRes = await fetch('https://api.linear.app/graphql', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-G2-Extension': 'linear',
-              },
-              body: JSON.stringify({
-                query: `query { projects(first: 100${afterClause}) { nodes { id name slugId } pageInfo { hasNextPage endCursor } } }`,
-              }),
-            })
+          const searchRes = await fetch('https://api.linear.app/graphql', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-G2-Extension': 'linear',
+            },
+            body: JSON.stringify({
+              query: `query($term: String!) { searchProjects(term: $term, first: 20) { nodes { id name slugId } } }`,
+              variables: { term: searchTerm },
+            }),
+          })
 
-            if (!searchRes.ok) {
-              console.warn(`[LJS] Linear projects list failed:`, searchRes.status)
-              break
-            }
+          if (!searchRes.ok) {
+            console.warn(`[LJS] Linear project search failed:`, searchRes.status)
+            continue
+          }
 
-            const searchRaw = await searchRes.json()
-            const searchData = searchRaw?.data?.data ?? searchRaw?.data ?? searchRaw
-            const nodes = searchData?.projects?.nodes ?? []
-            const pageInfo = searchData?.projects?.pageInfo
+          const searchRaw = await searchRes.json()
+          console.log('[LJS] Project search raw:', JSON.stringify(searchRaw).slice(0, 300))
+          const searchData = searchRaw?.data?.data ?? searchRaw?.data ?? searchRaw
+          const searchNodes = searchData?.searchProjects?.nodes ?? []
+          const match = searchNodes.find((p: any) =>
+            p.slugId === shortSlugId || pair.linearIdentifier.endsWith(p.slugId)
+          )
 
-            const match = nodes.find((p: any) =>
-              p.slugId === shortSlugId || p.slugId === pair.linearIdentifier || pair.linearIdentifier.endsWith(p.slugId)
-            )
-
-            if (match) {
-              matchedProjectId = match.id
-              matchedProjectName = match.name
-              found = true
-              console.log('[LJS] Matched project:', match.name, match.id, 'slugId:', match.slugId)
-            } else if (pageInfo?.hasNextPage && pageInfo?.endCursor) {
-              cursor = pageInfo.endCursor
-            } else {
-              break
-            }
+          if (match) {
+            matchedProjectId = match.id
+            matchedProjectName = match.name
+            console.log('[LJS] Matched project:', match.name, match.id)
           }
 
           if (!matchedProjectId) {
