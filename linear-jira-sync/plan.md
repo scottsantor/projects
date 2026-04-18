@@ -147,6 +147,7 @@ The Activity Log tab shows a history of all actions taken through the app, store
 
 ### UI / Branding
 - **Header** — Jira logo, bidirectional arrow (SVG), Linear logo, app title. Logos are 64px, title is text-3xl. Centered layout.
+- **Top right bar** — contact info (`Questions? ssantor@ or #data-help-customer-support`) and a link to the GitHub build source (`Build: GitHub` linking to `https://github.com/scottsantor/projects/tree/main/linear-jira-sync`).
 - **Logos** — stored in `public/` directory (`jira_logo.png`, `linear_logo.png`), must be copied into `build/client/` during deploy.
 - **Attribution** — every submitted ticket's Notes field ends with `Submitted with the help of https://g2.sqprod.co/apps/linear-jira-sync-coa`. Sync updates end with `(automated update from https://g2.sqprod.co/apps/linear-jira-sync-coa)`.
 
