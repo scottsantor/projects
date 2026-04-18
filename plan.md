@@ -51,8 +51,9 @@ A Block App Kit web app that bridges COA Jira tickets (with CCOPORT component) t
 - Jira keys in the table are clickable hyperlinks to the Jira ticket.
 
 ### Project vs Issue Handling
-- **Project URL entered** — fetches all project-level updates AND all issues within the project (statuses + comments). The project is found by paginating through all Linear projects and matching the slug ID from the URL.
+- **Project URL entered** — fetches all project-level updates AND all issues within the project (statuses + comments). The project is found using `searchProjects` (see Jira API Configuration section for details on why pagination doesn't work).
 - **Issue URL/ID entered** — fetches that single issue's status, comments, and its parent project updates.
+- If a pair was added before project detection existed, it may have `isProject: false`. Remove and re-add the pair with the full project URL to fix.
 
 ### Update Format
 - All Linear updates for a given Jira ticket are consolidated into **one combined update** regardless of how many Linear issues/projects are linked.
@@ -92,8 +93,17 @@ A Block App Kit web app that bridges COA Jira tickets (with CCOPORT component) t
   )
   ```
 
+### Per-Ticket Submit
+- Each Jira ticket gets its own "Submit Update to COA-XXX" button on its card (similar to New Requests tab).
+- After successful submission, that card is removed from the list and a success message shows with a link to the Jira ticket.
+- Other cards remain so they can be submitted independently.
+
 ### Success Feedback
 - After successfully posting to Jira, show a clear success message with the Jira ticket key and a link to verify: `Jira comment posted successfully to COA-719 (https://block.atlassian.net/browse/COA-719). Check the Jira ticket to verify the update.`
+
+### Input Flexibility
+- **Jira input** accepts either a key (`COA-719`) or a full URL (`https://block.atlassian.net/browse/COA-719`) — the key is extracted automatically.
+- **Jira keys are clickable links** throughout the UI — in the linked pairs table and on sync update cards.
 
 ---
 
