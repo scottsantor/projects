@@ -3,6 +3,7 @@ import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Input } from '../ui/input'
 import { llmComplete } from '../../lib/llm'
+import { addActivityEntry } from '../../lib/activityLog'
 import type { TicketMapping } from '../../App'
 
 interface LinkedPair {
@@ -583,16 +584,16 @@ Return ONLY the 4-5 sentence summary, nothing else.`)
           throw new Error(`Failed to comment on ${summary.jiraKey}: No allowed Jira endpoint found. The comment API may need to be added to the kgoose proxy allowlist. As a workaround, copy the update text and paste it manually into the Jira ticket.`)
         }
 
-        // Log activity
-        await fetch('/api/activity', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'synced_to_jira',
-            actor: 'ssantor',
-            details: `Synced ${summary.updates.length} update(s) from ${sourceNames} to ${summary.jiraKey}`,
-          }),
-        }).catch(() => {})
+        // Log activity to localStorage
+        const projectSource = summary.linearSources.find((s) => !s.identifier.match(/^[A-Z]+-\d+$/))
+        addActivityEntry({
+          type: 'jira_update',
+          jiraKey: summary.jiraKey,
+          jiraUrl: `https://block.atlassian.net/browse/${summary.jiraKey}`,
+          linearIdentifier: projectSource?.identifier || sourceNames,
+          linearUrl: projectSource?.url || summary.linearSources[0]?.url || '',
+          summary: commentText.replace(/^Linear Sync Update:\n/, '').slice(0, 300),
+        })
 
         synced++
       }

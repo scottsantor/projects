@@ -3,6 +3,7 @@ import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Input } from '../ui/input'
 import { llmComplete } from '../../lib/llm'
+import { addActivityEntry } from '../../lib/activityLog'
 import type { TicketMapping } from '../../App'
 
 // CUSTDS team and template IDs
@@ -456,6 +457,16 @@ Return ONLY the 2-3 sentence justification, nothing else.`)
           actor: form.requestor || 'ssantor',
           details: `Created ${linearIssue.identifier} from ${ticket.jira.key}: ${form.title}`,
         }),
+      })
+
+      // Log activity
+      addActivityEntry({
+        type: 'rads_request',
+        jiraKey: ticket.jira.key,
+        jiraUrl: ticket.jira.url,
+        linearIdentifier: linearIssue.identifier,
+        linearUrl: linearIssue.url,
+        summary: `${form.title} — ${form.businessJustification.slice(0, 150)}`,
       })
 
       // Mark as submitted

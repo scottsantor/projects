@@ -97,6 +97,21 @@ A Block App Kit web app that bridges COA Jira tickets (with CCOPORT component) t
 
 ---
 
+## Activity Log (Tab 3)
+
+The Activity Log tab shows a history of all actions taken through the app, stored in browser localStorage (not the D1 database, which isn't reliably available for reads in the G2 iframe context).
+
+### Two Sections
+1. **RADS Requests Submitted** — logged each time a ticket is submitted to Linear from the New Requests tab. Shows timestamp (PT), Jira key (linked), Linear issue identifier (linked), and a summary of the request title + business justification.
+2. **Jira Tickets Updated** — logged each time a sync update is posted to Jira from the Sync Updates tab. Shows timestamp (PT), Jira key (linked), Linear source (linked), and the summarized update content.
+
+### Storage
+- Uses `localStorage` key `ljs_activity_log` — persists in the user's browser.
+- Each entry includes: type, timestamp, Jira key/URL, Linear identifier/URL, and summary.
+- Keeps last 200 entries.
+
+---
+
 ## Architecture
 
 ### Platform
