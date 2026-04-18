@@ -1,0 +1,335 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@plugin '@tailwindcss/typography';
+
+@source '../../index.html';
+@source '../**/*.{ts,tsx}';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Palette — raw color values for direct use */
+@theme {
+  --shadow-*: initial;
+
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  --color-neutral-50: #f4f6f7;
+  --color-neutral-100: #e3e6ea;
+  --color-neutral-200: #cbd1d6;
+  --color-neutral-300: #a7b0b9;
+  --color-neutral-400: #878787;
+  --color-neutral-500: #606c7a;
+  --color-neutral-600: #525b68;
+  --color-neutral-700: #474e57;
+  --color-neutral-800: #3f434b;
+  --color-neutral-900: #32353b;
+  --color-neutral-950: #22252a;
+
+  --color-red-100: #ff6b6b;
+  --color-red-200: #f94b4b;
+
+  --color-blue-100: #7cacff;
+  --color-blue-200: #5c98f9;
+
+  --color-green-100: #a3d795;
+  --color-green-200: #91cb80;
+
+  --color-yellow-100: #ffd966;
+  --color-yellow-200: #fbcd44;
+
+  /* Brand accents */
+  --color-cash-green: #00d632;
+  --color-cash-green-dark: #00a025;
+  --color-square-blue: #006aff;
+  --color-square-blue-dark: #0052cc;
+}
+
+/* MCP Semantic Token Registration — enables Tailwind utility classes.
+   Self-referential var() for colors, `initial` for non-color tokens.
+   Actual values are set in :root and .dark below. */
+@theme inline {
+  /* Backgrounds */
+  --color-background-primary: var(--color-background-primary);
+  --color-background-secondary: var(--color-background-secondary);
+  --color-background-tertiary: var(--color-background-tertiary);
+  --color-background-inverse: var(--color-background-inverse);
+  --color-background-ghost: var(--color-background-ghost);
+  --color-background-info: var(--color-background-info);
+  --color-background-danger: var(--color-background-danger);
+  --color-background-success: var(--color-background-success);
+  --color-background-warning: var(--color-background-warning);
+  --color-background-disabled: var(--color-background-disabled);
+
+  /* Text */
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-tertiary: var(--color-text-tertiary);
+  --color-text-inverse: var(--color-text-inverse);
+  --color-text-ghost: var(--color-text-ghost);
+  --color-text-info: var(--color-text-info);
+  --color-text-danger: var(--color-text-danger);
+  --color-text-success: var(--color-text-success);
+  --color-text-warning: var(--color-text-warning);
+  --color-text-disabled: var(--color-text-disabled);
+
+  /* Borders */
+  --color-border-primary: var(--color-border-primary);
+  --color-border-secondary: var(--color-border-secondary);
+  --color-border-tertiary: var(--color-border-tertiary);
+  --color-border-inverse: var(--color-border-inverse);
+  --color-border-ghost: var(--color-border-ghost);
+  --color-border-info: var(--color-border-info);
+  --color-border-danger: var(--color-border-danger);
+  --color-border-success: var(--color-border-success);
+  --color-border-warning: var(--color-border-warning);
+  --color-border-disabled: var(--color-border-disabled);
+
+  /* Rings */
+  --color-ring-primary: var(--color-ring-primary);
+  --color-ring-secondary: var(--color-ring-secondary);
+  --color-ring-inverse: var(--color-ring-inverse);
+  --color-ring-info: var(--color-ring-info);
+  --color-ring-danger: var(--color-ring-danger);
+  --color-ring-success: var(--color-ring-success);
+  --color-ring-warning: var(--color-ring-warning);
+
+  /* Brand accent (varies by theme) */
+  --color-accent: var(--color-accent);
+  --color-accent-foreground: var(--color-accent-foreground);
+
+  /* Typography */
+  --font-sans: initial;
+  --font-mono: initial;
+
+  /* Border radius */
+  --border-radius-xs: initial;
+  --border-radius-sm: initial;
+  --border-radius-md: initial;
+  --border-radius-lg: initial;
+  --border-radius-xl: initial;
+  --border-radius-full: initial;
+
+  /* Shadows */
+  --shadow-hairline: initial;
+  --shadow-sm: initial;
+  --shadow-md: initial;
+  --shadow-lg: initial;
+}
+
+/* Compatibility aliases — maps common shadcn naming to MCP semantic tokens */
+@theme inline {
+  --color-ring: var(--color-ring-primary);
+  --color-input: var(--color-border-primary);
+  --color-background: var(--color-background-primary);
+  --color-foreground: var(--color-text-primary);
+  --color-muted-foreground: var(--color-text-secondary);
+  --color-destructive: var(--color-border-danger);
+}
+
+/* Light theme — default token values */
+:root {
+  --font-sans: 'Cash Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --border-radius-xs: 2px;
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-xl: 16px;
+  --border-radius-full: 9999px;
+
+  --color-background-primary: #ffffff;
+  --color-background-secondary: #f4f6f7;
+  --color-background-tertiary: #e3e6ea;
+  --color-background-inverse: #000000;
+  --color-background-ghost: transparent;
+  --color-background-info: #5c98f9;
+  --color-background-danger: #f94b4b;
+  --color-background-success: #91cb80;
+  --color-background-warning: #fbcd44;
+  --color-background-disabled: #e3e6ea;
+
+  --color-text-primary: #3f434b;
+  --color-text-secondary: #878787;
+  --color-text-tertiary: #a7b0b9;
+  --color-text-inverse: #ffffff;
+  --color-text-ghost: #878787;
+  --color-text-info: #5c98f9;
+  --color-text-danger: #f94b4b;
+  --color-text-success: #91cb80;
+  --color-text-warning: #fbcd44;
+  --color-text-disabled: #cbd1d6;
+
+  --color-border-primary: #e3e6ea;
+  --color-border-secondary: #e3e6ea;
+  --color-border-tertiary: #cbd1d6;
+  --color-border-inverse: #000000;
+  --color-border-ghost: transparent;
+  --color-border-info: #5c98f9;
+  --color-border-danger: #f94b4b;
+  --color-border-success: #91cb80;
+  --color-border-warning: #fbcd44;
+  --color-border-disabled: #e3e6ea;
+
+  --color-ring-primary: #e3e6ea;
+  --color-ring-secondary: #cbd1d6;
+  --color-ring-inverse: #ffffff;
+  --color-ring-info: #5c98f9;
+  --color-ring-danger: #f94b4b;
+  --color-ring-success: #91cb80;
+  --color-ring-warning: #fbcd44;
+
+  /* Brand accent (Block = neutral, no colored accent) */
+  --color-accent: #3f434b;
+  --color-accent-foreground: #ffffff;
+
+  --shadow-hairline: 0 0 0 1px rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark theme (Block) */
+.dark {
+  --color-background-primary: #22252a;
+  --color-background-secondary: #3f434b;
+  --color-background-tertiary: #474e57;
+  --color-background-inverse: #cbd1d6;
+  --color-background-ghost: transparent;
+  --color-background-info: #7cacff;
+  --color-background-danger: #ff6b6b;
+  --color-background-success: #a3d795;
+  --color-background-warning: #ffd966;
+  --color-background-disabled: #474e57;
+
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #878787;
+  --color-text-tertiary: #606c7a;
+  --color-text-inverse: #000000;
+  --color-text-ghost: #878787;
+  --color-text-info: #7cacff;
+  --color-text-danger: #ff6b6b;
+  --color-text-success: #a3d795;
+  --color-text-warning: #ffd966;
+  --color-text-disabled: #525b68;
+
+  --color-border-primary: #3f434b;
+  --color-border-secondary: #525b68;
+  --color-border-tertiary: #474e57;
+  --color-border-inverse: #ffffff;
+  --color-border-ghost: transparent;
+  --color-border-info: #7cacff;
+  --color-border-danger: #ff6b6b;
+  --color-border-success: #a3d795;
+  --color-border-warning: #ffd966;
+  --color-border-disabled: #3f434b;
+
+  --color-ring-primary: #525b68;
+  --color-ring-secondary: #474e57;
+  --color-ring-inverse: #000000;
+  --color-ring-info: #7cacff;
+  --color-ring-danger: #ff6b6b;
+  --color-ring-success: #a3d795;
+  --color-ring-warning: #ffd966;
+
+  /* Brand accent (Block dark) */
+  --color-accent: #e3e6ea;
+  --color-accent-foreground: #22252a;
+
+  --shadow-hairline: 0 0 0 1px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
+}
+
+/* ============================================
+   Cash App Theme
+   ============================================ */
+.theme-cash {
+  --color-accent: #00d632;
+  --color-accent-foreground: #ffffff;
+
+  /* Tinted secondary backgrounds */
+  --color-background-secondary: #f0faf0;
+  --color-background-tertiary: #e0f5e0;
+}
+
+.theme-cash.dark,
+.dark .theme-cash {
+  --color-accent: #00d632;
+  --color-accent-foreground: #000000;
+
+  /* Tinted dark backgrounds */
+  --color-background-secondary: #1a2e1a;
+  --color-background-tertiary: #243524;
+}
+
+/* ============================================
+   Square Theme
+   ============================================ */
+.theme-square {
+  --color-accent: #006aff;
+  --color-accent-foreground: #ffffff;
+
+  /* Tinted secondary backgrounds */
+  --color-background-secondary: #f0f5ff;
+  --color-background-tertiary: #e0ecff;
+}
+
+.theme-square.dark,
+.dark .theme-square {
+  --color-accent: #006aff;
+  --color-accent-foreground: #ffffff;
+
+  /* Tinted dark backgrounds */
+  --color-background-secondary: #1a2540;
+  --color-background-tertiary: #243050;
+}
+
+@layer base {
+  * {
+    @apply border-border-primary;
+  }
+  body {
+    @apply bg-background-primary text-text-primary;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+}
+
+/* Cash Sans from Square CDN */
+@font-face {
+  font-family: 'Cash Sans';
+  src: url(https://cash-f.squarecdn.com/static/fonts/cashsans/woff2/CashSans-Regular.woff2) format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Cash Sans';
+  src: url(https://cash-f.squarecdn.com/static/fonts/cashsans/woff2/CashSans-Medium.woff2) format('woff2');
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Cash Sans';
+  src: url(https://cash-f.squarecdn.com/static/fonts/cashsans/woff2/CashSans-Bold.woff2) format('woff2');
+  font-weight: 700;
+  font-style: normal;
+}
+
+/* Radix ScrollArea — hide native scrollbars when custom scrollbar is shown */
+[data-radix-scroll-area-viewport] {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar {
+  display: none;
+}
+
+[data-radix-scroll-area-viewport] > div {
+  display: block !important;
+}

@@ -1,0 +1,18 @@
+# App Manifest - Single source of truth for what this app is and what it can do
+# This file is uploaded with deployments and shared with services like kgoose
+
+# Identity
+app_id: linear-jira-sync
+name: linear-jira-sync
+description: Syncs COA Jira tickets (CCOPORT) to RADS Linear (CUSTDS) and writes Linear updates back to Jira
+owners:
+  - ssantor
+tags: ["internal-tool", "automation"]
+
+# Permissions
+permissions:
+  extensions:
+    jira:
+      access: read_write
+    linear:
+      access: read_write

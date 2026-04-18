@@ -1,0 +1,25 @@
+/* Custom Theme Override
+   ======================
+   This file is where you define custom themes beyond the built-in Block, Cash, and Square themes.
+   The agent writes to this file when you request custom theming (e.g., "make it feel retro").
+   
+   IMPORTANT: This file is imported after main.css, so any CSS variables defined here
+   will override the defaults. You should only override the semantic tokens you want to change.
+   
+   Example custom theme:
+   
+   .theme-custom {
+     --color-accent: #ff6b35;
+     --color-accent-foreground: #ffffff;
+     --color-background-secondary: #fff8f5;
+     --color-background-tertiary: #ffefe8;
+   }
+   
+   .theme-custom.dark,
+   .dark .theme-custom {
+     --color-accent: #ff8c5a;
+     --color-accent-foreground: #000000;
+     --color-background-secondary: #2a1f1a;
+     --color-background-tertiary: #352520;
+   }
+*/
