@@ -87,7 +87,7 @@ export function SyncUpdates({ mappings, onMappingsChange }: Props) {
   const [newLinearInput, setNewLinearInput] = useState('')
   const [summaries, setSummaries] = useState<JiraSyncSummary[]>([])
   const [loading, setLoading] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const [submittingKey, setSubmittingKey] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
@@ -476,133 +476,70 @@ Return ONLY the 4-5 sentence summary, nothing else.`)
     }
   }
 
-  const submitUpdatesToJira = async () => {
-    console.log('[LJS] Submit clicked, summaries:', summaries.length)
-    if (summaries.length === 0) {
-      console.log('[LJS] No summaries to submit')
-      return
-    }
+  const submitSingleToJira = async (jiraKey: string) => {
+    const summary = summaries.find((s) => s.jiraKey === jiraKey)
+    if (!summary) return
 
-    setSubmitting(true)
+    setSubmittingKey(jiraKey)
     setError(null)
     setSuccessMsg(null)
 
     try {
-      let synced = 0
+      const sourceNames = summary.linearSources.map((s) => s.identifier).join(', ')
+      const commentText = summary.combinedBody
 
-      for (const summary of summaries) {
-        const sourceNames = summary.linearSources.map((s) => s.identifier).join(', ')
-        const commentText = summary.combinedBody
+      console.log(`[LJS] Posting comment to ${summary.jiraKey}:`, commentText.slice(0, 200))
 
-        console.log(`[LJS] Posting comment to ${summary.jiraKey}:`, commentText.slice(0, 200))
-
-        // Try multiple approaches to add a comment to Jira
-        const endpoints = [
-          // Approach 1: PUT issue update with comment property (v3)
-          {
-            url: `https://api.atlassian.com/ex/jira/31e7a210-9ba8-468d-a1d1-a806c34e5961/rest/api/3/issue/${summary.jiraKey}`,
-            method: 'PUT',
-            body: {
-              update: {
-                comment: [{
-                  add: {
-                    body: {
-                      type: 'doc',
-                      version: 1,
-                      content: [{ type: 'paragraph', content: [{ type: 'text', text: commentText }] }],
-                    },
+      // Use PUT issue update with comment property (v3) — confirmed working
+      const res = await fetch(
+        `https://api.atlassian.com/ex/jira/31e7a210-9ba8-468d-a1d1-a806c34e5961/rest/api/3/issue/${summary.jiraKey}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-G2-Extension': 'jira',
+          },
+          body: JSON.stringify({
+            update: {
+              comment: [{
+                add: {
+                  body: {
+                    type: 'doc',
+                    version: 1,
+                    content: [{ type: 'paragraph', content: [{ type: 'text', text: commentText }] }],
                   },
-                }],
-              },
+                },
+              }],
             },
-            label: 'v3 PUT update.comment',
-          },
-          // Approach 2: PUT issue update with comment property (v2)
-          {
-            url: `https://api.atlassian.com/ex/jira/31e7a210-9ba8-468d-a1d1-a806c34e5961/rest/api/2/issue/${summary.jiraKey}`,
-            method: 'PUT',
-            body: {
-              update: {
-                comment: [{
-                  add: {
-                    body: commentText,
-                  },
-                }],
-              },
-            },
-            label: 'v2 PUT update.comment',
-          },
-          // Approach 3: POST comment endpoint (v3)
-          {
-            url: `https://api.atlassian.com/ex/jira/31e7a210-9ba8-468d-a1d1-a806c34e5961/rest/api/3/issue/${summary.jiraKey}/comment`,
-            method: 'POST',
-            body: {
-              body: {
-                type: 'doc',
-                version: 1,
-                content: [{ type: 'paragraph', content: [{ type: 'text', text: commentText }] }],
-              },
-            },
-            label: 'v3 POST comment',
-          },
-        ]
-
-        let posted = false
-        for (const ep of endpoints) {
-          console.log(`[LJS] Trying ${ep.label}: ${ep.method} ${ep.url}`)
-
-          const res = await fetch(ep.url, {
-            method: ep.method,
-            headers: {
-              'Content-Type': 'application/json',
-              'X-G2-Extension': 'jira',
-            },
-            body: JSON.stringify(ep.body),
-          })
-
-          const rawRes = await res.json().catch(() => ({}))
-          console.log(`[LJS] Response from ${ep.label}:`, JSON.stringify(rawRes).slice(0, 300))
-
-          if (rawRes?.success !== false) {
-            posted = true
-            console.log(`[LJS] Successfully posted via ${ep.label}`)
-            break
-          }
-
-          if (rawRes?.error?.includes('allowlist')) {
-            console.log(`[LJS] Not on allowlist, trying next...`)
-            continue
-          }
-
-          throw new Error(`Failed to comment on ${summary.jiraKey}: ${rawRes.error || res.status}`)
+          }),
         }
+      )
 
-        if (!posted) {
-          throw new Error(`Failed to comment on ${summary.jiraKey}: No allowed Jira endpoint found. The comment API may need to be added to the kgoose proxy allowlist. As a workaround, copy the update text and paste it manually into the Jira ticket.`)
-        }
+      const rawRes = await res.json().catch(() => ({}))
+      console.log(`[LJS] Jira response for ${summary.jiraKey}:`, JSON.stringify(rawRes).slice(0, 300))
 
-        // Log activity to localStorage
-        const projectSource = summary.linearSources.find((s) => !s.identifier.match(/^[A-Z]+-\d+$/))
-        addActivityEntry({
-          type: 'jira_update',
-          jiraKey: summary.jiraKey,
-          jiraUrl: `https://block.atlassian.net/browse/${summary.jiraKey}`,
-          linearIdentifier: projectSource?.identifier || sourceNames,
-          linearUrl: projectSource?.url || summary.linearSources[0]?.url || '',
-          summary: commentText.replace(/^Linear Sync Update:\n/, '').slice(0, 300),
-        })
-
-        synced++
+      if (rawRes?.success === false) {
+        throw new Error(`Failed to comment on ${summary.jiraKey}: ${rawRes.error || 'Unknown error'}`)
       }
 
-      const jiraKeys = [...new Set(summaries.map((s) => s.jiraKey))]
-      const jiraLinks = jiraKeys.map((k) => `${k} (https://block.atlassian.net/browse/${k})`).join(', ')
-      setSuccessMsg(`Jira comment posted successfully to ${jiraLinks}. Check the Jira ticket to verify the update.`)
-      setSummaries([])
+      // Log activity
+      const projectSource = summary.linearSources.find((s) => !s.identifier.match(/^[A-Z]+-\d+$/))
+      addActivityEntry({
+        type: 'jira_update',
+        jiraKey: summary.jiraKey,
+        jiraUrl: `https://block.atlassian.net/browse/${summary.jiraKey}`,
+        linearIdentifier: projectSource?.identifier || sourceNames,
+        linearUrl: projectSource?.url || summary.linearSources[0]?.url || '',
+        summary: commentText.replace(/^Linear Sync Update:\n/, '').slice(0, 300),
+      })
+
+      // Remove this summary from the list and show success
+      setSummaries((prev) => prev.filter((s) => s.jiraKey !== jiraKey))
+      setSuccessMsg(`Jira comment posted successfully to ${jiraKey} (https://block.atlassian.net/browse/${jiraKey}). Check the Jira ticket to verify the update.`)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
-      setSubmitting(false)
+      setSubmittingKey(null)
     }
   }
 
@@ -706,8 +643,8 @@ Return ONLY the 4-5 sentence summary, nothing else.`)
 
           {summaries.length > 0 && (
             <div className="space-y-4">
-              {summaries.map((s, i) => (
-                <Card key={i} className="border border-border-primary">
+              {summaries.map((s) => (
+                <Card key={s.jiraKey} className="border border-border-primary">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>
@@ -732,7 +669,13 @@ Return ONLY the 4-5 sentence summary, nothing else.`)
                           {' '}-- {s.updates.length} update(s)
                         </p>
                       </div>
-                      <span className="text-xs text-text-secondary">{s.updates.length} update(s)</span>
+                      <Button
+                        size="sm"
+                        onClick={() => submitSingleToJira(s.jiraKey)}
+                        disabled={submittingKey === s.jiraKey}
+                      >
+                        {submittingKey === s.jiraKey ? 'Posting...' : `Submit Update to ${s.jiraKey}`}
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -745,12 +688,6 @@ Return ONLY the 4-5 sentence summary, nothing else.`)
                   </CardContent>
                 </Card>
               ))}
-
-              <div className="flex justify-end">
-                <Button onClick={submitUpdatesToJira} disabled={submitting}>
-                  {submitting ? 'Syncing...' : `Submit Updates to ${summaries.length} Jira Ticket(s)`}
-                </Button>
-              </div>
             </div>
           )}
         </CardContent>
