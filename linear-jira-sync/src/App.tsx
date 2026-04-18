@@ -46,6 +46,17 @@ function App() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
+      <div className="flex justify-end gap-4 text-xs text-text-secondary mb-2">
+        <span>Questions? ssantor@ or #data-help-customer-support</span>
+        <a
+          href="https://github.com/scottsantor/projects/tree/main/linear-jira-sync"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-text-info hover:underline"
+        >
+          Build: GitHub
+        </a>
+      </div>
       <header className="mb-8 flex items-center justify-center gap-5">
         <img src="/jira_logo.png" alt="Jira" className="h-16 w-16" />
         <svg className="h-8 w-8 text-text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
