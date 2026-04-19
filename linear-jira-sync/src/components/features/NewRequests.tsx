@@ -151,7 +151,7 @@ function buildNotes(jira: JiraIssue): string {
   return lines.join('\n')
 }
 
-function translateToLinearForm(jira: JiraIssue): LinearFormData {
+function translateToLinearForm(jira: JiraIssue, emailOverride?: string): LinearFormData {
   const descText = jira.description || ''
   const parentDesc = jira.parentDescription || ''
 
@@ -171,10 +171,12 @@ function translateToLinearForm(jira: JiraIssue): LinearFormData {
 
   const { requestDescription, businessJustification } = parseJiraDescription(combinedDesc)
 
-  // Use parent ticket's Reporter as requestor (not the assignee, who is the data analyst)
-  const requestorLdap = jira.parentReporterEmail
-    ? jira.parentReporterEmail.split('@')[0]
-    : jira.parentReporter || jira.assignee || ''
+  // Use email override if set, otherwise fall back to parent ticket's Reporter
+  const requestorLdap = emailOverride
+    ? emailOverride.split('@')[0]
+    : jira.parentReporterEmail
+      ? jira.parentReporterEmail.split('@')[0]
+      : jira.parentReporter || jira.assignee || ''
 
   return {
     title: jira.summary,
@@ -191,6 +193,16 @@ export function NewRequests({ mappings, onMappingsChange }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [jiraEmail, setJiraEmail] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ljs_settings') || '{}').jiraEmail || '' } catch { return '' }
+  })
+  const [emailSaved, setEmailSaved] = useState(false)
+
+  const saveEmail = () => {
+    localStorage.setItem('ljs_settings', JSON.stringify({ jiraEmail }))
+    setEmailSaved(true)
+    setTimeout(() => setEmailSaved(false), 2000)
+  }
 
   const fetchJiraTickets = async () => {
     setLoading(true)
@@ -297,7 +309,7 @@ export function NewRequests({ mappings, onMappingsChange }: Props) {
 
         fetched.push({
           jira,
-          linearForm: translateToLinearForm(jira),
+          linearForm: translateToLinearForm(jira, jiraEmail || undefined),
           alreadyLinked: existingKeys.has(issue.key),
         })
       }
@@ -501,9 +513,24 @@ Return ONLY the 2-3 sentence justification, nothing else.`)
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-text-secondary text-sm mb-4">
-            Fetches COA tickets with CCOPORT component, reads parent ticket details, and translates into CUSTDS Linear request format.
-          </p>
+          <ul className="text-text-secondary text-sm mb-4 space-y-1 list-disc list-inside">
+            <li>Fetches COA tickets with CCOPORT component, reads parent ticket details, and translates into CUSTDS Linear request format.</li>
+            <li>Click "Grab New COA Requests" to fetch tickets from Jira.</li>
+            <li className="font-mono text-xs">JQL: created &gt;= -365d and component = "CCOPORT" and "Delivery Team[Select List (multiple choices)]" in ("COA","COA - CI") and issuetype in (Task, Sub-task) and status not in ("Done","Won't Do") order by created DESC</li>
+          </ul>
+
+          <div className="flex items-center gap-2 mb-4 max-w-md">
+            <label className="text-xs text-text-secondary whitespace-nowrap">Your Jira email (requestor override):</label>
+            <Input
+              value={jiraEmail}
+              onChange={(e) => setJiraEmail(e.target.value)}
+              placeholder="e.g. ssantor@squareup.com"
+              className="text-xs h-7"
+            />
+            <Button size="sm" variant="outline" onClick={saveEmail} className="whitespace-nowrap">
+              {emailSaved ? 'Saved' : 'Save'}
+            </Button>
+          </div>
 
           {error && (
             <div className="p-3 mb-4 rounded bg-background-danger text-text-danger text-sm">
@@ -544,7 +571,7 @@ Return ONLY the 2-3 sentence justification, nothing else.`)
           )}
 
           {tickets.length === 0 && !loading && (
-            <p className="text-text-secondary text-sm">Click "Grab New COA Requests" to fetch tickets from Jira.</p>
+            <p className="text-text-secondary text-sm">No tickets loaded yet.</p>
           )}
         </CardContent>
       </Card>

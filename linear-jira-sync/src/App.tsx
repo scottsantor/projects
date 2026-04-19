@@ -1,9 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
 import { NewRequests } from './components/features/NewRequests'
 import { SyncUpdates } from './components/features/SyncUpdates'
-import { ActivityLog } from './components/features/ActivityLog'
-import { Settings } from './components/features/Settings'
 
 export interface TicketMapping {
   id: number
@@ -75,22 +73,14 @@ function App() {
       {/* Tabs — forceMount keeps state alive across tab switches */}
       <Tabs defaultValue="new-requests">
         <TabsList>
-          <TabsTrigger value="new-requests">New Requests</TabsTrigger>
-          <TabsTrigger value="sync-updates">Sync Updates</TabsTrigger>
-          <TabsTrigger value="activity">Activity Log</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="new-requests">Grab new COA Jira requests</TabsTrigger>
+          <TabsTrigger value="sync-updates">Sync Linear updates to Jira</TabsTrigger>
         </TabsList>
         <TabsContent value="new-requests" forceMount className="data-[state=inactive]:hidden">
           <NewRequests mappings={mappings} onMappingsChange={fetchMappings} />
         </TabsContent>
         <TabsContent value="sync-updates" forceMount className="data-[state=inactive]:hidden">
           <SyncUpdates mappings={mappings} onMappingsChange={fetchMappings} />
-        </TabsContent>
-        <TabsContent value="activity" forceMount className="data-[state=inactive]:hidden">
-          <ActivityLog />
-        </TabsContent>
-        <TabsContent value="settings" forceMount className="data-[state=inactive]:hidden">
-          <Settings />
         </TabsContent>
       </Tabs>
     </div>

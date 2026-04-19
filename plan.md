@@ -29,7 +29,9 @@ A Block App Kit web app that bridges COA Jira tickets (with CCOPORT component) t
 - **Requested Due Date** — From COA ticket due date field.
 - **Notes (optional)** — Source links (COA URL, parent URL). Only add additional content if there are **critical timing/hold signals** from the parent ticket (status is on hold/blocked/paused, or recent comments mention delays/deprioritization). Summarize in 1-2 sentences max. End with attribution: `Submitted with the help of https://g2.sqprod.co/apps/linear-jira-sync-coa`.
 
-### UI (Tab 1: "New Requests")
+### UI (Tab 1: "Grab new COA Jira requests")
+- **Bulleted description** at top — explains what the tab does, prompts to click the button, and shows the JQL used to fetch tickets.
+- **Jira email override field** — inline at the top; lets any user set their Jira email to override the auto-detected requestor LDAP. Stored in `localStorage` under `ljs_settings`. If blank, falls back to parent ticket's Reporter email.
 - **"Grab New COA Requests" button** — fetches CCOPORT tickets from Jira.
 - **Summary count** — shows total fetched, how many are new vs already linked.
 - **Collapsible ticket cards** — each card defaults to collapsed showing Jira key, summary, parent status, priority, and a "Submit to RADS Linear Cust Ops DS" button. Click to expand and see/edit all Linear form fields.
@@ -107,19 +109,6 @@ A Block App Kit web app that bridges COA Jira tickets (with CCOPORT component) t
 
 ---
 
-## Activity Log (Tab 3)
-
-The Activity Log tab shows a history of all actions taken through the app, stored in browser localStorage (not the D1 database, which isn't reliably available for reads in the G2 iframe context).
-
-### Two Sections
-1. **RADS Requests Submitted** — logged each time a ticket is submitted to Linear from the New Requests tab. Shows timestamp (PT), Jira key (linked), Linear issue identifier (linked), and a summary of the request title + business justification.
-2. **Jira Tickets Updated** — logged each time a sync update is posted to Jira from the Sync Updates tab. Shows timestamp (PT), Jira key (linked), Linear source (linked), and the summarized update content.
-
-### Storage
-- Uses `localStorage` key `ljs_activity_log` — persists in the user's browser.
-- Each entry includes: type, timestamp, Jira key/URL, Linear identifier/URL, and summary.
-- Keeps last 200 entries.
-
 ---
 
 ## Architecture
@@ -156,7 +145,7 @@ The Activity Log tab shows a history of all actions taken through the app, store
 - **activity_log** — records who did what, when (America/Los_Angeles timezone), and the details.
 
 ### Auth
-- Default to the logged-in user's G2 Jira and Linear connections. Settings tab allows optional email override for the Requestor LDAP field.
+- Default to the logged-in user's G2 Jira and Linear connections. Jira email override is configurable inline on the "Grab new COA Jira requests" tab (stored in localStorage).
 
 ---
 
@@ -202,7 +191,7 @@ The Activity Log tab shows a history of all actions taken through the app, store
 
 ## Deploy Notes
 - After `npm run build`, must copy logos into build output: `cp public/*.png build/client/`
-- Deploy with `appkit deploy linear-jira-sync-coa ./build` (production environment)
+- Deploy with `appkit deploy linear-jira-sync-coa ./build --env production`
 - Database migrations: `appkit migrate linear-jira-sync-coa ./migrations` (production environment)
 
 ---
