@@ -82,37 +82,83 @@ with volumes as (
 )
 
 -- ------------------------------------------------------------------------
--- business_lines_best — hand-curated queue_name -> business_line mapping,
--- loaded from columns A:B of the `business_lines_best` tab in the
--- companion Google Sheet. Channel column is 'Digital' or 'Voice'; Digital
--- covers our 'Messaging' + 'Email/Other' simplified channels.
+-- business_lines_best — hand-curated queue_name -> business_line mapping.
+-- Channel is 'Digital' or 'Voice'; 'Digital' covers our 'Messaging' and
+-- 'Email/Other' simplified channels. Primary source for queue_group.
+--
+-- Sourced from:
+--   https://docs.google.com/spreadsheets/d/14VYFicBoF1xTUwPALAL9bOB-vv_lnMXfS2djIIoZjwM/edit?gid=103004255#gid=103004255
+--   Tab: "Legacy Afterpay FCR v2", cells B5:E26.
 -- ------------------------------------------------------------------------
 , business_lines_best as (
 
     select column1 as business_line
         , column2 as bl_channel
     from (values
-          ('Global Digital',              'Digital')
-        , ('Global Digital',              'Voice')
-        , ('Global ID Verification',      'Digital')
-        , ('Global Help With Repayments', 'Digital')
+          ('Global Digital',               'Digital')
+        , ('Global Digital',               'Voice')
+        , ('Global ID Verification',       'Digital')
+        , ('Global Help With Repayments',  'Digital')
         , ('Global Refund/ Return Support','Digital')
-        , ('ANZ Escalations',             'Digital')
-        , ('ANZ Escalations',             'Voice')
-        , ('ANZ Voice',                   'Digital')
-        , ('ANZ Voice',                   'Voice')
-        , ('Licenced Support Team (US)',  'Digital')
-        , ('Licenced Support Team (US)',  'Voice')
-        , ('Licenced Team (US)',          'Digital')
-        , ('Licenced Team (US)',          'Voice')
-        , ('NA Escalations',              'Digital')
-        , ('NA Escalations',              'Voice')
-        , ('UK Escalations',              'Digital')
-        , ('UK Escalations',              'Voice')
-        , ('UK Voice',                    'Digital')
-        , ('UK Voice',                    'Voice')
-        , ('USA Voice (DO NOT ASSIGN)',   'Digital')
-        , ('USA Voice (DO NOT ASSIGN)',   'Voice')
+        , ('ANZ Escalations',              'Digital')
+        , ('ANZ Escalations',              'Voice')
+        , ('ANZ Voice',                    'Digital')
+        , ('ANZ Voice',                    'Voice')
+        , ('Licenced Support Team (US)',   'Digital')
+        , ('Licenced Support Team (US)',   'Voice')
+        , ('Licenced Team (US)',           'Digital')
+        , ('Licenced Team (US)',           'Voice')
+        , ('NA Escalations',               'Digital')
+        , ('NA Escalations',               'Voice')
+        , ('UK Escalations',               'Digital')
+        , ('UK Escalations',               'Voice')
+        , ('UK Voice',                     'Digital')
+        , ('UK Voice',                     'Voice')
+        , ('USA Voice (DO NOT ASSIGN)',    'Digital')
+        , ('USA Voice (DO NOT ASSIGN)',    'Voice')
+    )
+
+)
+
+-- ------------------------------------------------------------------------
+-- business_lines_wfm — allowed business lines from the WFM "Block Business
+-- Line Mapping" sheet. Canonical set (25 business lines) used as the
+-- fallback CASE below. Listed here so the SQL is self-contained.
+--
+-- Sourced from:
+--   https://docs.google.com/spreadsheets/d/10Z4mHOQVXtDEpERpn0Zn9az0bmNfLSHn_54SuhvWYJw/edit?gid=1900547438#gid=1900547438
+--   Tab: "AFTERPAY: Queue to Business Line", column F (business lines),
+--   plus enrichment from column H (queue_ids embedded in the regex).
+-- ------------------------------------------------------------------------
+, business_lines_wfm as (
+
+    select column1 as business_line
+    from (values
+          ('ANZ Collection')
+        , ('ANZ Digital')
+        , ('ANZ Merchant')
+        , ('ANZ Merchant Admin')
+        , ('ANZ Merchant Disputes')
+        , ('ANZ Voice')
+        , ('Chargebacks')
+        , ('Global | Cards')
+        , ('Global Fin rec')
+        , ('Global Investigations')
+        , ('Global Merchant Shop directory')
+        , ('Global Social Media')
+        , ('Global Trust Pilot')
+        , ('Manual ID')
+        , ('NA Collections')
+        , ('NA Digital')
+        , ('NA Merchant Admin')
+        , ('NA Merchant Disputes')
+        , ('NA Voice')
+        , ('Pay Monthly')
+        , ('UK Collections')
+        , ('UK Digital')
+        , ('UK Merchant Admin')
+        , ('UK Merchant Disputes')
+        , ('UK Voice')
     )
 
 )
