@@ -414,8 +414,8 @@ select brand
     , queue_owner
     , queue_function
     , queue_group
-    , queue_name
     , queue_id
+    , queue_name
     , geography
     , language
     , contacts_last_30d
