@@ -409,7 +409,16 @@ with volumes as (
 -- Cascading volume-weighted sort: at each level, rank groups by their
 -- total contacts in the current run; within each group, drop to the
 -- next level; final tiebreaker is per-queue contacts desc.
-select *
+select brand
+    , channel
+    , queue_owner
+    , queue_function
+    , queue_group
+    , queue_name
+    , queue_id
+    , geography
+    , language
+    , contacts_last_30d
 from final
 order by
       sum(contacts_last_30d) over (partition by channel)                                                      desc
