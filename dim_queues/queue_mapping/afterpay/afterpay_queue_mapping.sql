@@ -289,14 +289,41 @@ select a.brand
           else a.raw_business_line
       end                                            as queue_group
 
-    -- For now, queue_function mirrors queue_group.
+    -- queue_function: 7-category natural bucketing based on queue_name.
+    -- Order matters — more specific patterns first.
     , case
-          when a.raw_business_line ilike any (
-              '%Global Digital%', '%NA Digital%', '%UK Digital%', '%ANZ Digital%',
-              '%CAN Digital%', '%USA Digital%'
-          ) then 'Global Digital'
-          else a.raw_business_line
-      end                                            as queue_function
+          -- Escalations (matched before voice/digital to win over General Support)
+          when a.queue_name ilike '%escalation%'                                       then 'Escalations'
+
+          -- Risk & Chargebacks (chargebacks, investigations, tokens, cards)
+          when a.queue_name ilike '%chargeback%'
+            or a.queue_name ilike '%investigation%'
+            or a.queue_name ilike '%token removal%'
+            or a.queue_name ilike '%card%'                                             then 'Risk & Chargebacks'
+
+          -- Identity Verification
+          when a.queue_name ilike '%id verification%'
+            or a.queue_name ilike '%manual id%'                                        then 'Identity Verification'
+
+          -- Hardship & Repayments
+          when a.queue_name ilike '%hardship%'
+            or a.queue_name ilike '%help with repayments%'                             then 'Hardship & Repayments'
+
+          -- Refunds / Returns
+          when a.queue_name ilike '%refund%'
+            or a.queue_name ilike '%return%'                                           then 'Refunds/Returns'
+
+          -- Licensed Support (Pay Monthly regulated lending)
+          when a.queue_name ilike '%licenced%'
+            or a.queue_name ilike '%licensed%'                                         then 'Licensed Support'
+
+          -- General Support (regional voice + digital queues)
+          when a.queue_name ilike '%voice%'
+            or a.queue_name ilike '%digital%'                                          then 'General Support'
+
+          -- Fallback
+          else 'Other'
+      end                                                                              as queue_function
 
     -- Queue owner: best-effort bucketing based on queue_name / queue_group.
     , case
