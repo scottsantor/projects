@@ -327,7 +327,9 @@ with volumes as (
 
 )
 
-select a.brand
+, final as (
+
+    select a.brand
     , a.channel
     , a.queue_id
     , a.queue_name
@@ -400,55 +402,19 @@ select a.brand
     , a.language
     , a.contacts_last_30d
 
-from assigned a
+    from assigned a
 
--- Cascading sort: at each level, rank groups by their total contacts in
--- the current run, then within each group by the next level down, ending
--- with queue_name ascending for stability.
+)
+
+-- Cascading volume-weighted sort: at each level, rank groups by their
+-- total contacts in the current run; within each group, drop to the
+-- next level; final tiebreaker is per-queue contacts desc.
+select *
+from final
 order by
-      sum(a.contacts_last_30d) over (partition by a.channel)                                                              desc
-    , sum(a.contacts_last_30d) over (partition by a.channel,
-                                                  case /*-- queue_owner --*/
-                                                      when a.queue_name ilike any ('%chargeback%','%investigation%','%fin rec%','%token removal%','%id verification%','%manual id%','%fraud%','%risk%','%cards%') then 'Risk Operations'
-                                                      when a.queue_name ilike any ('%licenced%','%licensed%','%pay monthly%','%collection%','%hardship%','%acknowledgement%','%complaint%','%help with repayments%') then 'Compliance Operations'
-                                                      else 'Customer Operations'
-                                                  end)                                                                    desc
-    , sum(a.contacts_last_30d) over (partition by a.channel,
-                                                  case /*-- queue_owner --*/
-                                                      when a.queue_name ilike any ('%chargeback%','%investigation%','%fin rec%','%token removal%','%id verification%','%manual id%','%fraud%','%risk%','%cards%') then 'Risk Operations'
-                                                      when a.queue_name ilike any ('%licenced%','%licensed%','%pay monthly%','%collection%','%hardship%','%acknowledgement%','%complaint%','%help with repayments%') then 'Compliance Operations'
-                                                      else 'Customer Operations'
-                                                  end,
-                                                  case /*-- queue_function --*/
-                                                      when a.queue_name ilike '%escalation%'                                                               then 'Escalations'
-                                                      when a.queue_name ilike any ('%chargeback%','%investigation%','%token removal%','%card%')            then 'Risk & Chargebacks'
-                                                      when a.queue_name ilike any ('%id verification%','%manual id%')                                      then 'Identity Verification'
-                                                      when a.queue_name ilike any ('%hardship%','%help with repayments%')                                  then 'Hardship & Repayments'
-                                                      when a.queue_name ilike any ('%refund%','%return%')                                                  then 'Refunds/Returns'
-                                                      when a.queue_name ilike any ('%licenced%','%licensed%')                                              then 'Licensed Support'
-                                                      when a.queue_name ilike any ('%voice%','%digital%')                                                  then 'General Support'
-                                                      else 'Other'
-                                                  end)                                                                    desc
-    , sum(a.contacts_last_30d) over (partition by a.channel,
-                                                  case /*-- queue_owner --*/
-                                                      when a.queue_name ilike any ('%chargeback%','%investigation%','%fin rec%','%token removal%','%id verification%','%manual id%','%fraud%','%risk%','%cards%') then 'Risk Operations'
-                                                      when a.queue_name ilike any ('%licenced%','%licensed%','%pay monthly%','%collection%','%hardship%','%acknowledgement%','%complaint%','%help with repayments%') then 'Compliance Operations'
-                                                      else 'Customer Operations'
-                                                  end,
-                                                  case /*-- queue_function --*/
-                                                      when a.queue_name ilike '%escalation%'                                                               then 'Escalations'
-                                                      when a.queue_name ilike any ('%chargeback%','%investigation%','%token removal%','%card%')            then 'Risk & Chargebacks'
-                                                      when a.queue_name ilike any ('%id verification%','%manual id%')                                      then 'Identity Verification'
-                                                      when a.queue_name ilike any ('%hardship%','%help with repayments%')                                  then 'Hardship & Repayments'
-                                                      when a.queue_name ilike any ('%refund%','%return%')                                                  then 'Refunds/Returns'
-                                                      when a.queue_name ilike any ('%licenced%','%licensed%')                                              then 'Licensed Support'
-                                                      when a.queue_name ilike any ('%voice%','%digital%')                                                  then 'General Support'
-                                                      else 'Other'
-                                                  end,
-                                                  case /*-- queue_group --*/
-                                                      when a.raw_business_line ilike any ('%Global Digital%','%NA Digital%','%UK Digital%','%ANZ Digital%','%CAN Digital%','%USA Digital%')
-                                                          then 'Global Digital'
-                                                      else a.raw_business_line
-                                                  end)                                                                    desc
-    , a.queue_name                                                                                                         asc
+      sum(contacts_last_30d) over (partition by channel)                                                      desc
+    , sum(contacts_last_30d) over (partition by channel, queue_owner)                                         desc
+    , sum(contacts_last_30d) over (partition by channel, queue_owner, queue_function)                         desc
+    , sum(contacts_last_30d) over (partition by channel, queue_owner, queue_function, queue_group)            desc
+    , contacts_last_30d                                                                                       desc
 ;
