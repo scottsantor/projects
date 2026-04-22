@@ -14,10 +14,16 @@
 --   web, email       -> Email/Other
 --
 -- Business-line assignment:
---   1. Primary — exact queue_name match against `business_lines_best`
---      (columns A:B of the business_lines_best tab), filtered by channel.
+--   1. Primary — exact queue_name match against the `business_lines_best`
+--      CTE (inline below), filtered by channel. Sourced from:
+--        https://docs.google.com/spreadsheets/d/14VYFicBoF1xTUwPALAL9bOB-vv_lnMXfS2djIIoZjwM/edit?gid=103004255#gid=103004255
+--        Tab "Legacy Afterpay FCR v2", cells B5:E26.
 --   2. Fallback — derived from WFM regex mapping (group_id lists + tag
---      heuristics). Less accurate; business_lines from business_lines_wfm.
+--      heuristics). Less accurate. Allowed values in the `business_lines_wfm`
+--      CTE (inline below). Sourced from:
+--        https://docs.google.com/spreadsheets/d/10Z4mHOQVXtDEpERpn0Zn9az0bmNfLSHn_54SuhvWYJw/edit?gid=1900547438#gid=1900547438
+--        Tab "AFTERPAY: Queue to Business Line", column F, with enrichment
+--        from column H (queue_ids embedded in the regex).
 -- ============================================================================
 
 with volumes as (
