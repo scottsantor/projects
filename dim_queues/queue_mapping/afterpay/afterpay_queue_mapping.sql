@@ -279,7 +279,6 @@ select a.brand
     , a.channel
     , a.queue_id
     , a.queue_name
-    , a.business_area
 
     -- Collapse country-specific digital variants into a single Global Digital bucket.
     , case
