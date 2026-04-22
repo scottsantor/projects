@@ -190,6 +190,7 @@ function translateToLinearForm(jira: JiraIssue, emailOverride?: string): LinearF
 
 export function NewRequests({ mappings, onMappingsChange }: Props) {
   const [tickets, setTickets] = useState<FetchedTicket[]>([])
+  const [hiddenCount, setHiddenCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
@@ -242,6 +243,16 @@ export function NewRequests({ mappings, onMappingsChange }: Props) {
       console.log('[LJS] Issues found:', jiraData?.issues?.length ?? 0)
 
       const existingKeys = new Set(mappings.map((m) => m.jira_key))
+      // Also exclude anything already tracked in the SyncUpdates pairs table (localStorage)
+      try {
+        const stored = localStorage.getItem('ljs_linked_pairs')
+        if (stored) {
+          const pairs: Array<{ jiraKey: string }> = JSON.parse(stored)
+          for (const p of pairs) existingKeys.add(p.jiraKey)
+        }
+      } catch {
+        // ignore malformed localStorage
+      }
       const fetched: FetchedTicket[] = []
 
       for (const issue of jiraData?.issues || []) {
@@ -307,10 +318,12 @@ export function NewRequests({ mappings, onMappingsChange }: Props) {
           dueDate: fields.duedate || null,
         }
 
+        if (existingKeys.has(issue.key)) continue
+
         fetched.push({
           jira,
           linearForm: translateToLinearForm(jira, jiraEmail || undefined),
-          alreadyLinked: existingKeys.has(issue.key),
+          alreadyLinked: false,
         })
       }
 
@@ -356,6 +369,8 @@ Return ONLY the 2-3 sentence justification, nothing else.`)
 
       // Wait for all LLM calls to finish, then show everything at once
       await Promise.all(llmPromises)
+      const totalFromJira = jiraData?.issues?.length ?? 0
+      setHiddenCount(Math.max(0, totalFromJira - fetched.length))
       setTickets(fetched)
     } catch (err) {
       console.error('[LJS] Jira fetch error:', err)
@@ -434,10 +449,13 @@ Return ONLY the 2-3 sentence justification, nothing else.`)
 
       if (!createRes.ok) throw new Error(`Linear API failed: ${createRes.status}`)
       const rawCreate = await createRes.json()
-      const createData = rawCreate?.data ? rawCreate : { data: rawCreate }
+      // Unwrap G2 proxy wrapper ({success, data, statusCode}) if present
+      const createData = rawCreate?.statusCode !== undefined && rawCreate?.data
+        ? rawCreate.data
+        : rawCreate
 
-      if (!createData.data?.issueCreate?.success) {
-        throw new Error(`Linear issue creation failed: ${JSON.stringify(createData.errors || createData)}`)
+      if (!createData?.data?.issueCreate?.success) {
+        throw new Error(`Linear issue creation failed: ${JSON.stringify(createData?.errors || createData)}`)
       }
 
       const linearIssue = createData.data.issueCreate.issue
@@ -489,6 +507,26 @@ Return ONLY the 2-3 sentence justification, nothing else.`)
             : t
         )
       )
+      // Add to the SyncUpdates pairs list in localStorage so the new link
+      // shows up in the Sync-Linear-updates-to-Jira table without manual entry
+      try {
+        const stored = localStorage.getItem('ljs_linked_pairs')
+        const existing: Array<{ jiraKey: string; linearId: string; linearIdentifier: string; isProject: boolean }> = stored ? JSON.parse(stored) : []
+        const dup = existing.some(
+          (p) => p.jiraKey === ticket.jira.key && p.linearIdentifier === linearIssue.identifier
+        )
+        if (!dup) {
+          const updated = [
+            ...existing,
+            { jiraKey: ticket.jira.key, linearId: linearIssue.id, linearIdentifier: linearIssue.identifier, isProject: false },
+          ]
+          localStorage.setItem('ljs_linked_pairs', JSON.stringify(updated))
+          window.dispatchEvent(new CustomEvent('ljs-pairs-changed'))
+        }
+      } catch {
+        // non-fatal — submission already succeeded
+      }
+
       setSuccessMsg(`Submitted ${ticket.jira.key} → ${linearIssue.identifier}`)
       onMappingsChange()
     } catch (err) {
@@ -498,8 +536,6 @@ Return ONLY the 2-3 sentence justification, nothing else.`)
       setError(`Failed to submit ${ticket.jira.key}: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
-
-  const linkedTickets = tickets.filter((t) => t.alreadyLinked)
 
   return (
     <div className="space-y-4 mt-4">
@@ -517,6 +553,7 @@ Return ONLY the 2-3 sentence justification, nothing else.`)
             <li>Fetches COA tickets with CCOPORT component, reads parent ticket details, and translates into CUSTDS Linear request format.</li>
             <li>Click "Grab New COA Requests" to fetch tickets from Jira.</li>
             <li className="font-mono text-xs">JQL: created &gt;= -365d and component = "CCOPORT" and "Delivery Team[Select List (multiple choices)]" in ("COA","COA - CI") and issuetype in (Task, Sub-task) and status not in ("Done","Won't Do") order by created DESC</li>
+            <li>Only captures net new COA tickets that have not already been linked to a Linear ticket in the 'Sync Linear updates to Jira' tab of this webpage.</li>
           </ul>
 
           <div className="flex items-center gap-2 mb-4 max-w-md">
@@ -533,26 +570,20 @@ Return ONLY the 2-3 sentence justification, nothing else.`)
           </div>
 
           {error && (
-            <div className="p-3 mb-4 rounded bg-background-danger text-text-danger text-sm">
+            <div className="p-3 mb-4 rounded bg-background-danger text-white text-sm">
               {error}
             </div>
           )}
           {successMsg && (
-            <div className="p-3 mb-4 rounded bg-background-success text-text-success text-sm">
+            <div className="p-3 mb-4 rounded bg-background-success text-white text-sm">
               {successMsg}
-            </div>
-          )}
-
-          {linkedTickets.length > 0 && (
-            <div className="mb-4 p-3 rounded bg-background-secondary text-text-secondary text-sm">
-              {linkedTickets.length} ticket(s) already linked — skipped
             </div>
           )}
 
           {tickets.length > 0 && (
             <>
               <p className="text-sm text-text-primary mb-4 font-medium">
-                {tickets.length} ticket(s) found — {tickets.filter(t => !t.alreadyLinked).length} new, {tickets.filter(t => t.alreadyLinked).length} already linked
+                {tickets.length} new ticket(s){hiddenCount > 0 && ` — ${hiddenCount} already linked and hidden`}
               </p>
               <div className="space-y-3">
                 {tickets.map((ticket) => {
@@ -623,10 +654,10 @@ function TicketCard({
           </div>
           <div onClick={(e) => e.stopPropagation()}>
             {ticket.alreadyLinked ? (
-              <span className="text-xs font-medium text-text-success px-3 py-1 rounded bg-background-success">
+              <span className="text-xs font-medium text-white px-3 py-1 rounded bg-background-success">
                 {ticket.submittedIdentifier ? (
                   <a href={ticket.submittedUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                    Submitted → {ticket.submittedIdentifier}
+                    Submitted: {ticket.submittedIdentifier}
                   </a>
                 ) : 'Already linked'}
               </span>

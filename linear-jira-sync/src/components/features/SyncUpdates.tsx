@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
 import { Input } from '../ui/input'
@@ -83,9 +83,17 @@ function parseLinearInput(input: string): { id: string; identifier: string; isPr
 
 export function SyncUpdates({ mappings, onMappingsChange }: Props) {
   const [pairs, setPairs] = useState<LinkedPair[]>(loadSavedPairs)
+
+  useEffect(() => {
+    const reload = () => setPairs(loadSavedPairs())
+    window.addEventListener('ljs-pairs-changed', reload)
+    return () => window.removeEventListener('ljs-pairs-changed', reload)
+  }, [])
+
   const [newJiraKey, setNewJiraKey] = useState('')
   const [newLinearInput, setNewLinearInput] = useState('')
   const [summaries, setSummaries] = useState<JiraSyncSummary[]>([])
+  const [triageEntries, setTriageEntries] = useState<Array<{ jiraKey: string; linearIdentifier: string; linearUrl: string }>>([])
   const [loading, setLoading] = useState(false)
   const [submittingKey, setSubmittingKey] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -126,9 +134,13 @@ export function SyncUpdates({ mappings, onMappingsChange }: Props) {
     setLoading(true)
     setError(null)
     setSuccessMsg(null)
+    setTriageEntries([])
 
     try {
       const allUpdates: LinearUpdate[] = []
+      // Per-pair state snapshot used to emit a "no-updates" row for pairs that have nothing new
+      const pairInfo = new Map<string, { linearUrl: string; stateName: string; stateType: string; isProject: boolean }>()
+      const pairKey = (jiraKey: string, linearIdentifier: string) => `${jiraKey}|${linearIdentifier}`
 
       for (const pair of pairs) {
         if (pair.isProject) {
@@ -250,6 +262,13 @@ export function SyncUpdates({ mappings, onMappingsChange }: Props) {
 
           const projectUrl = project.url || `https://linear.app/squareup/project/${pair.linearIdentifier}`
 
+          pairInfo.set(pairKey(pair.jiraKey, pair.linearIdentifier), {
+            linearUrl: projectUrl,
+            stateName: project.state || 'Unknown',
+            stateType: 'project',
+            isProject: true,
+          })
+
           // Project-level updates
           for (const update of project.projectUpdates?.nodes || []) {
             allUpdates.push({
@@ -349,6 +368,14 @@ export function SyncUpdates({ mappings, onMappingsChange }: Props) {
           }
 
           const issueUrl = issueData.url || `https://linear.app/squareup/issue/${issueData.identifier || pair.linearIdentifier}`
+
+          pairInfo.set(pairKey(pair.jiraKey, pair.linearIdentifier), {
+            linearUrl: issueUrl,
+            stateName: issueData.state?.name || 'Unknown',
+            stateType: issueData.state?.type || 'unknown',
+            isProject: false,
+          })
+
           const terminalStates = ['Done', 'Canceled', 'Duplicate']
           if (terminalStates.includes(issueData.state?.name)) {
             allUpdates.push({
@@ -393,7 +420,7 @@ export function SyncUpdates({ mappings, onMappingsChange }: Props) {
 
       allUpdates.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
-      // Group by Jira key into one combined summary per ticket
+      // Group updates by Jira key
       const byJira = new Map<string, LinearUpdate[]>()
       for (const u of allUpdates) {
         const existing = byJira.get(u.jiraKey) || []
@@ -401,14 +428,95 @@ export function SyncUpdates({ mappings, onMappingsChange }: Props) {
         byJira.set(u.jiraKey, existing)
       }
 
-      if (allUpdates.length === 0) {
-        setSummaries([])
-        setSuccessMsg('No updates found from Linear.')
-        return
+      // Emit a row for every Jira ticket in pairs — even when nothing new came from Linear
+      const orderedJiraKeys: string[] = []
+      const seenJira = new Set<string>()
+      for (const p of pairs) {
+        if (!seenJira.has(p.jiraKey)) {
+          seenJira.add(p.jiraKey)
+          orderedJiraKeys.push(p.jiraKey)
+        }
       }
 
       const grouped: JiraSyncSummary[] = []
-      for (const [jiraKey, jiraUpdates] of byJira.entries()) {
+      const triageRows: Array<{ jiraKey: string; linearIdentifier: string; linearUrl: string }> = []
+      for (const jiraKey of orderedJiraKeys) {
+        const jiraUpdates = byJira.get(jiraKey) || []
+        const pairsForJira = pairs.filter((p) => p.jiraKey === jiraKey)
+
+        // No updates path — if every pair is still in triage, skip the full summary and
+        // show a compact row in the triage-queue table instead. Otherwise emit a
+        // deterministic status-only summary.
+        if (jiraUpdates.length === 0) {
+          const allTriage =
+            pairsForJira.length > 0 &&
+            pairsForJira.every((p) => {
+              const info = pairInfo.get(pairKey(jiraKey, p.linearIdentifier))
+              return info && !info.isProject && info.stateType === 'triage'
+            })
+          if (allTriage) {
+            for (const p of pairsForJira) {
+              const info = pairInfo.get(pairKey(jiraKey, p.linearIdentifier))!
+              triageRows.push({
+                jiraKey,
+                linearIdentifier: p.linearIdentifier,
+                linearUrl: info.linearUrl,
+              })
+            }
+            continue
+          }
+
+          const linearSources: LinearSource[] = pairsForJira.map((p) => {
+            const info = pairInfo.get(pairKey(jiraKey, p.linearIdentifier))
+            const fallbackUrl = p.isProject
+              ? `https://linear.app/squareup/project/${p.linearIdentifier}`
+              : `https://linear.app/squareup/issue/${p.linearIdentifier}`
+            return { identifier: p.linearIdentifier, url: info?.linearUrl || fallbackUrl }
+          })
+
+          const linkLines: string[] = ['Linear Sync Update:']
+          for (const src of linearSources) {
+            if (src.identifier.match(/^[A-Z]+-\d+$/)) {
+              linkLines.push(`${src.identifier}: ${src.url}`)
+            } else {
+              linkLines.push(`Project: ${src.url}`)
+            }
+          }
+
+          const statusLines: string[] = []
+          for (const p of pairsForJira) {
+            const info = pairInfo.get(pairKey(jiraKey, p.linearIdentifier))
+            if (!info) {
+              statusLines.push(`Could not reach Linear for ${p.linearIdentifier}.`)
+              continue
+            }
+            if (info.isProject) {
+              statusLines.push(`No new Linear project updates since last sync for ${p.linearIdentifier}.`)
+            } else if (info.stateType === 'triage') {
+              const team = p.linearIdentifier.match(/^([A-Z]+)-/)?.[1]
+              const queue = team ? `Linear ${team} triage queue` : 'Linear triage queue'
+              statusLines.push(`${p.linearIdentifier} is still sitting in the ${queue}.`)
+            } else {
+              statusLines.push(`${p.linearIdentifier}: No Linear updates since last sync. Currently in state "${info.stateName}".`)
+            }
+          }
+
+          const combinedBody =
+            linkLines.join('\n') +
+            '\n\n' +
+            statusLines.join(' ') +
+            '\n\n(automated update from https://g2.sqprod.co/apps/linear-jira-sync-coa)'
+
+          grouped.push({
+            jiraKey,
+            linearSources,
+            updates: [],
+            combinedBody,
+          })
+          continue
+        }
+
+        {
         // Deduplicate Linear sources with their URLs
         const sourceMap = new Map<string, string>()
         for (const u of jiraUpdates) {
@@ -466,9 +574,13 @@ Return ONLY the 4-5 sentence summary, nothing else.`)
           updates: jiraUpdates,
           combinedBody,
         })
+        }
       }
 
       setSummaries(grouped)
+      setTriageEntries(triageRows)
+      const total = grouped.length + triageRows.length
+      setSuccessMsg(`Fetched status for ${total} ticket${total === 1 ? '' : 's'}.`)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -631,18 +743,66 @@ Return ONLY the 4-5 sentence summary, nothing else.`)
           </p>
 
           {error && (
-            <div className="p-3 mb-4 rounded bg-background-danger text-text-danger text-sm">
+            <div className="p-3 mb-4 rounded bg-background-danger text-white text-sm">
               {error}
             </div>
           )}
           {successMsg && (
-            <div className="p-4 mb-4 rounded border border-green-300 bg-green-50 text-green-800 text-sm font-medium">
+            <div className="p-4 mb-4 rounded bg-background-success text-white text-sm font-medium">
               {successMsg}
             </div>
           )}
 
+          {triageEntries.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-text-primary mb-2">
+                Still in Linear triage queue ({triageEntries.length})
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border-primary">
+                      <th className="text-left py-2 pr-4 text-text-secondary font-medium">Jira</th>
+                      <th className="text-left py-2 pr-4 text-text-secondary font-medium">Linear</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {triageEntries.map((t, i) => (
+                      <tr key={i} className="border-b border-border-secondary last:border-0">
+                        <td className="py-2 pr-4 font-mono">
+                          <a
+                            href={`https://block.atlassian.net/browse/${t.jiraKey}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-text-info hover:underline"
+                          >
+                            {t.jiraKey}
+                          </a>
+                        </td>
+                        <td className="py-2 pr-4 font-mono">
+                          <a
+                            href={t.linearUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-text-info hover:underline"
+                          >
+                            {t.linearIdentifier}
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {summaries.length > 0 && (
-            <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-semibold text-text-primary mb-2">
+                Linear updates available ({summaries.length})
+              </h3>
+              <div className="space-y-4">
               {summaries.map((s) => (
                 <Card key={s.jiraKey} className="border border-border-primary">
                   <CardHeader>
@@ -688,6 +848,7 @@ Return ONLY the 4-5 sentence summary, nothing else.`)
                   </CardContent>
                 </Card>
               ))}
+              </div>
             </div>
           )}
         </CardContent>

@@ -30,15 +30,19 @@ A Block App Kit web app that bridges COA Jira tickets (with CCOPORT component) t
 - **Notes (optional)** — Source links (COA URL, parent URL). Only add additional content if there are **critical timing/hold signals** from the parent ticket (status is on hold/blocked/paused, or recent comments mention delays/deprioritization). Summarize in 1-2 sentences max. End with attribution: `Submitted with the help of https://g2.sqprod.co/apps/linear-jira-sync-coa`.
 
 ### UI (Tab 1: "Grab new COA Jira requests")
-- **Bulleted description** at top — explains what the tab does, prompts to click the button, and shows the JQL used to fetch tickets.
+- **Bulleted description** at top — four bullets that explain what the tab does, prompt the user to click the button, show the JQL, and document the already-linked filter (see "Already-linked filter" below).
 - **Jira email override field** — inline at the top; lets any user set their Jira email to override the auto-detected requestor LDAP. Stored in `localStorage` under `ljs_settings`. If blank, falls back to parent ticket's Reporter email.
 - **"Grab New COA Requests" button** — fetches CCOPORT tickets from Jira.
-- **Summary count** — shows total fetched, how many are new vs already linked.
+- **Already-linked filter** — any COA ticket whose Jira key already appears in the DB `mappings` table OR in the SyncUpdates `ljs_linked_pairs` localStorage list is excluded from the fetched results. The count line reads, e.g., `8 new ticket(s) — 4 already linked and hidden` so the user can still see how many were filtered out.
 - **Collapsible ticket cards** — each card defaults to collapsed showing Jira key, summary, parent status, priority, and a "Submit to RADS Linear Cust Ops DS" button. Click to expand and see/edit all Linear form fields.
 - **Auto-sizing text fields** — all textareas auto-expand to show full content without scrolling.
-- **Per-ticket submit** — each card has its own submit button. After submission, fields become read-only and show a link to the created Linear issue.
+- **Per-ticket submit** — each card has its own submit button. After a successful submit, the card's submit button is replaced with a small green pill (`Submitted: CUSTDS-xyz`, white text, links to the Linear issue) and form fields become read-only. The ticket stays visible in-session; the next "Grab" drops it because the filter now sees it.
+- **Auto-add to SyncUpdates pairs** — on successful submit, the handler also appends `{ jiraKey, linearId, linearIdentifier, isProject: false }` to `ljs_linked_pairs` in localStorage (deduped) and dispatches a `ljs-pairs-changed` CustomEvent. SyncUpdates listens for that event and re-reads localStorage, so the new row appears in the linked-pairs table on Tab 2 with no manual entry and no page reload.
 - **All fields loaded before display** — LLM business justification calls run in parallel and complete before tickets appear. No blank fields.
 - Linear issues are created on the **CUSTDS** team via GraphQL API with triage state.
+
+### Linear GraphQL response unwrap (gotcha)
+The G2 fetch proxy wraps Linear's GraphQL response as `{ success, data, statusCode }`, and Linear's GraphQL response itself has a top-level `data` key. The submit path must unwrap **twice**: detect the G2 envelope via `rawCreate?.statusCode !== undefined && rawCreate?.data`, then check `createData.data.issueCreate.success` on the inner payload. An earlier version of the code only unwrapped once, which caused the success check to throw *after* the Linear issue was already created — leaving orphan Linear issues with no DB mapping row.
 
 ---
 
@@ -49,7 +53,8 @@ A Block App Kit web app that bridges COA Jira tickets (with CCOPORT component) t
 - **Jira input** accepts either a key (e.g., `COA-719`) or a full URL (e.g., `https://block.atlassian.net/browse/COA-719`) — the key is extracted automatically.
 - **Linear input** accepts either an issue identifier (`CUSTDS-41`), an issue URL, or a **project URL** (e.g., `https://linear.app/squareup/project/cash-app-project-phone-plan-launch-2422862cf293/overview`).
 - Project URLs are auto-detected and tagged with a "Project" badge.
-- Pairs are persisted in browser localStorage.
+- Pairs are persisted in browser localStorage under `ljs_linked_pairs`.
+- **Auto-populated from Tab 1** — when a user submits a new COA request on Tab 1, the resulting pair is appended to `ljs_linked_pairs` automatically (deduped) and a `ljs-pairs-changed` event causes this table to re-read localStorage and render the new row immediately.
 - Jira keys in the table are clickable hyperlinks to the Jira ticket.
 
 ### Project vs Issue Handling
@@ -64,6 +69,13 @@ A Block App Kit web app that bridges COA Jira tickets (with CCOPORT component) t
   2. **4-5 sentence LLM-generated project-level summary** — focuses on overall progress, key milestones, what's being worked on, upcoming priorities, blockers/risks. Framed as a project update, not individual task callouts. Does not call out individual issues as complete if the project is still in-progress.
   3. **Attribution footer** — `(automated update from https://g2.sqprod.co/apps/linear-jira-sync-coa)`
 - Plain text only — no badges, no fancy formatting. This is straight text posted to Jira.
+
+### Triage table (no-summary path)
+- Clicking "Check for Linear Updates" produces a row for **every** ticket in the Linked Tickets table — no silent skips.
+- If a Linear issue has no new activity AND its state type is `triage` (including the default CUSTDS triage state newly-submitted tickets land in), it does **not** get a full LLM summary card. Instead it goes into a compact **Still in Linear triage queue (N)** table at the top of the results section showing Jira key and Linear identifier, both as live links. No Submit button.
+- Non-triage pairs with no updates (e.g., "Backlog", "In Progress" with nothing new) still produce a deterministic "No Linear updates since last sync. Currently in state 'X'." summary card — these skip the LLM call entirely.
+- The section below the triage table is headed **Linear updates available (N)** and contains the LLM summary cards with per-ticket Submit buttons. Section headers use `text-sm font-semibold`.
+- Per-pair state (`stateName`, `stateType`, `isProject`, `linearUrl`) is captured in a `pairInfo` map during the fetch loop so the no-updates branch can emit the right row type without refetching.
 
 ### Writing Comments to Jira
 - The Jira comment POST endpoint (`/issue/{key}/comment`) is **not on the kgoose proxy allowlist**.
@@ -138,6 +150,7 @@ A Block App Kit web app that bridges COA Jira tickets (with CCOPORT component) t
 - **Header** — Jira logo, bidirectional arrow (SVG), Linear logo, app title. Logos are 64px, title is text-3xl. Centered layout.
 - **Top right bar** — contact info (`Questions? ssantor@ or #data-help-customer-support`) and a link to the GitHub build source (`Build: GitHub` linking to `https://github.com/scottsantor/projects/tree/main/linear-jira-sync`).
 - **Logos** — stored in `public/` directory (`jira_logo.png`, `linear_logo.png`), must be copied into `build/client/` during deploy.
+- **Status boxes** — success and error banners on both tabs, and the in-line "Submitted: CUSTDS-xyz" pill on Tab 1, use **white text** on the semantic `bg-background-success` / `bg-background-danger` backgrounds. The default `text-text-success` / `text-text-danger` tokens render dark in dark mode and become unreadable against the colored background.
 - **Attribution** — every submitted ticket's Notes field ends with `Submitted with the help of https://g2.sqprod.co/apps/linear-jira-sync-coa`. Sync updates end with `(automated update from https://g2.sqprod.co/apps/linear-jira-sync-coa)`.
 
 ### Database (D1)
