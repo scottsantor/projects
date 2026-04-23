@@ -4,6 +4,7 @@ import { MyTickets } from './components/features/MyTickets'
 import { ClaudeCost } from './components/features/ClaudeCost'
 import { Todos } from './components/features/Todos'
 import { Notepad } from './components/features/Notepad'
+import { Links } from './components/features/Links'
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
             <TabsTrigger value="mine">My Work</TabsTrigger>
             <TabsTrigger value="notepad">Notepad</TabsTrigger>
             <TabsTrigger value="cost">Claude Cost</TabsTrigger>
+            <TabsTrigger value="links">Links</TabsTrigger>
           </TabsList>
 
           <TabsContent value="create" forceMount className="data-[state=inactive]:hidden">
@@ -42,6 +44,10 @@ function App() {
 
           <TabsContent value="cost" forceMount className="data-[state=inactive]:hidden">
             <ClaudeCost />
+          </TabsContent>
+
+          <TabsContent value="links" forceMount className="data-[state=inactive]:hidden">
+            <Links />
           </TabsContent>
         </Tabs>
       </div>
