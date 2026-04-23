@@ -3,9 +3,14 @@ import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { Card, CardContent } from '../ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible'
 
+interface LinkRow {
+  name: string
+  url: string
+}
+
 interface LinkSection {
   title: string
-  links: string[]
+  links: LinkRow[]
 }
 
 // Looker host is assembled at runtime so the deploy secret-scanner's
@@ -16,15 +21,15 @@ const SECTIONS: LinkSection[] = [
   {
     title: 'Block Web Apps',
     links: [
-      'https://g2.stage.sqprod.co/apps/ssantor-intern',
-      'https://g2.sqprod.co/apps/linear-jira-sync-coa',
+      { name: 'ssantor-intern', url: 'https://g2.stage.sqprod.co/apps/ssantor-intern' },
+      { name: 'linear-jira-sync-coa', url: 'https://g2.sqprod.co/apps/linear-jira-sync-coa' },
     ],
   },
   {
     title: 'Verified Dashboard Links',
     links: [
-      'https://app.mode.com/cashapp/reports/98e89d6bc3cd',
-      `https://${LOOKER_HOST}/dashboards/39691`,
+      { name: 'Speed to Answer Mode dash', url: 'https://app.mode.com/cashapp/reports/98e89d6bc3cd' },
+      { name: 'Support Prod Metrics Dash', url: `https://${LOOKER_HOST}/dashboards/39691` },
     ],
   },
 ]
@@ -52,21 +57,32 @@ function LinkGroup({ section }: { section: LinkSection }) {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="pt-0 pb-4">
-            <ul className="flex flex-col gap-2">
-              {section.links.map((url) => (
-                <li key={url}>
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-sm text-text-info hover:underline break-all"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
-                    <span>{url}</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border-primary text-left text-xs uppercase tracking-wide text-text-secondary">
+                  <th className="py-2 pr-4 font-medium w-1/3">Link Name</th>
+                  <th className="py-2 font-medium">Link</th>
+                </tr>
+              </thead>
+              <tbody>
+                {section.links.map((row) => (
+                  <tr key={row.url} className="border-b border-border-primary last:border-0">
+                    <td className="py-2 pr-4 align-top">{row.name}</td>
+                    <td className="py-2 align-top">
+                      <a
+                        href={row.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-text-info hover:underline break-all"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                        <span>{row.url}</span>
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
