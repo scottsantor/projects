@@ -1,0 +1,9 @@
+{
+  "$schema": "appkit-config",
+  "app_name": "ssantor-intern",
+  "brand": "block",
+  "type": "ui",
+  "database": true,
+  "generated_at": "2026-04-21T21:51:14.729615+00:00",
+  "appkit_version": "1.0.0"
+}

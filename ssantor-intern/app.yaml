@@ -1,0 +1,17 @@
+# App Manifest - Single source of truth for what this app is and what it can do
+# This file is uploaded with deployments and shared with services like kgoose
+
+# Identity
+app_id: ssantor-intern
+name: ssantor-intern
+display_name: Scott's Intern
+description: Personal Linear cockpit — create CUSTDS tickets and see tickets assigned to you.
+owners:
+  - ssantor
+tags: ["internal-tool", "linear"]
+
+# Permissions
+permissions:
+  extensions:
+    linear:
+      access: read_write

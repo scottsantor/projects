@@ -1,0 +1,157 @@
+{
+  "lastRefreshed": "2026-04-21T23:12:24Z",
+  "startDate": "2026-01-01",
+  "rates": {
+    "opus": {
+      "in": 15.0,
+      "out": 75.0,
+      "cw5m": 18.75,
+      "cw1h": 30.0,
+      "cr": 1.5
+    },
+    "sonnet": {
+      "in": 3.0,
+      "out": 15.0,
+      "cw5m": 3.75,
+      "cw1h": 6.0,
+      "cr": 0.3
+    },
+    "haiku": {
+      "in": 1.0,
+      "out": 5.0,
+      "cw5m": 1.25,
+      "cw1h": 2.0,
+      "cr": 0.1
+    }
+  },
+  "weeks": [
+    {
+      "weekOf": "2026-03-09",
+      "msgs": 516,
+      "tokens": 21949353,
+      "usd": 7.29,
+      "usdByFamily": {
+        "haiku": 4.09,
+        "opus": 3.21
+      },
+      "tokensByType": {
+        "input": 27079,
+        "output": 91415,
+        "cacheCreate": 1421587,
+        "cacheRead": 20409272
+      }
+    },
+    {
+      "weekOf": "2026-03-16",
+      "msgs": 1188,
+      "tokens": 180626331,
+      "usd": 261.56,
+      "usdByFamily": {
+        "haiku": 3.73,
+        "opus": 209.91,
+        "sonnet": 47.92
+      },
+      "tokensByType": {
+        "input": 49614,
+        "output": 165476,
+        "cacheCreate": 12852885,
+        "cacheRead": 167558356
+      }
+    },
+    {
+      "weekOf": "2026-03-23",
+      "msgs": 806,
+      "tokens": 56888245,
+      "usd": 181.42,
+      "usdByFamily": {
+        "opus": 180.95,
+        "haiku": 0.47
+      },
+      "tokensByType": {
+        "input": 3892,
+        "output": 121962,
+        "cacheCreate": 5428118,
+        "cacheRead": 51334273
+      }
+    },
+    {
+      "weekOf": "2026-03-30",
+      "msgs": 1426,
+      "tokens": 126993070,
+      "usd": 317.3,
+      "usdByFamily": {
+        "opus": 316.79,
+        "haiku": 0.52
+      },
+      "tokensByType": {
+        "input": 20204,
+        "output": 245505,
+        "cacheCreate": 6709933,
+        "cacheRead": 120017428
+      }
+    },
+    {
+      "weekOf": "2026-04-06",
+      "msgs": 1418,
+      "tokens": 179664421,
+      "usd": 365.9,
+      "usdByFamily": {
+        "opus": 365.9
+      },
+      "tokensByType": {
+        "input": 6438,
+        "output": 244178,
+        "cacheCreate": 4543235,
+        "cacheRead": 174870570
+      }
+    },
+    {
+      "weekOf": "2026-04-13",
+      "msgs": 2813,
+      "tokens": 265039751,
+      "usd": 608.42,
+      "usdByFamily": {
+        "opus": 606.08,
+        "sonnet": 1.4,
+        "haiku": 0.95
+      },
+      "tokensByType": {
+        "input": 9943,
+        "output": 518424,
+        "cacheCreate": 11099474,
+        "cacheRead": 253411910
+      }
+    },
+    {
+      "weekOf": "2026-04-20",
+      "msgs": 903,
+      "tokens": 190057389,
+      "usd": 424.73,
+      "usdByFamily": {
+        "opus": 424.68,
+        "sonnet": 0.05
+      },
+      "tokensByType": {
+        "input": 2199,
+        "output": 795412,
+        "cacheCreate": 4715327,
+        "cacheRead": 184544451
+      }
+    }
+  ],
+  "total": {
+    "msgs": 9070,
+    "tokens": 1021218560,
+    "usd": 2166.62,
+    "usdByFamily": {
+      "opus": 2107.52,
+      "sonnet": 49.37,
+      "haiku": 9.76
+    }
+  },
+  "notes": [
+    "Prices are list rates; actual billed amount may differ.",
+    "Opus 1M-context surcharge not applied.",
+    "Local Claude Code session logs only; no data before ~2026-03-09 on this machine."
+  ]
+}
