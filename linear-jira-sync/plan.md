@@ -33,11 +33,13 @@ A Block App Kit web app that bridges COA Jira tickets (with CCOPORT component) t
 - **Bulleted description** at top — four bullets that explain what the tab does, prompt the user to click the button, show the JQL, and document the already-linked filter (see "Already-linked filter" below).
 - **Jira email override field** — inline at the top; lets any user set their Jira email to override the auto-detected requestor LDAP. Stored in `localStorage` under `ljs_settings`. If blank, falls back to parent ticket's Reporter email.
 - **"Grab New COA Requests" button** — fetches CCOPORT tickets from Jira.
-- **Already-linked filter** — any COA ticket whose Jira key already appears in the DB `mappings` table OR in the SyncUpdates `ljs_linked_pairs` localStorage list is excluded from the fetched results. The count line reads, e.g., `8 new ticket(s) — 4 already linked and hidden` so the user can still see how many were filtered out.
+- **Already-linked filter** — any COA ticket whose Jira key already appears in the DB `mappings` table OR in the D1 `linked_pairs` table (fetched live via `GET /api/linked-pairs`) is excluded from the fetched results. The count line reads, e.g., `8 new ticket(s) - 4 already linked in 'Sync Linear updates to Jira' tab` so the user can still see how many were filtered out.
 - **Collapsible ticket cards** — each card defaults to collapsed showing Jira key, summary, parent status, priority, and a "Submit to RADS Linear Cust Ops DS" button. Click to expand and see/edit all Linear form fields.
 - **Auto-sizing text fields** — all textareas auto-expand to show full content without scrolling.
 - **Per-ticket submit** — each card has its own submit button. After a successful submit, the card's submit button is replaced with a small green pill (`Submitted: CUSTDS-xyz`, white text, links to the Linear issue) and form fields become read-only. The ticket stays visible in-session; the next "Grab" drops it because the filter now sees it.
-- **Auto-add to SyncUpdates pairs** — on successful submit, the handler also appends `{ jiraKey, linearId, linearIdentifier, isProject: false }` to `ljs_linked_pairs` in localStorage (deduped) and dispatches a `ljs-pairs-changed` CustomEvent. SyncUpdates listens for that event and re-reads localStorage, so the new row appears in the linked-pairs table on Tab 2 with no manual entry and no page reload.
+- **Button lifecycle** — the "Grab New COA Requests" button shows `Fetching...` while loading and `Fetched` once the fetch finishes (handled via a `hasFetched` flag; `setLoading(false)` runs in a `finally` so the button doesn't stick on `Fetching...` when the happy path returns).
+- **Empty state** — when zero tickets are returned after dedup the UI renders: _"No incremental COA Jira requests found that aren't already accounted for in the 'Sync Linear updates to Jira' tab."_
+- **Auto-add to SyncUpdates pairs** — on successful submit, the handler POSTs to `/api/linked-pairs` (server upserts on `(jira_key, linear_identifier)`) and dispatches a `ljs-pairs-changed` CustomEvent. SyncUpdates listens for the event and re-fetches from the API, so the new row appears in the linked-pairs table on Tab 2 with no manual entry and no page reload.
 - **All fields loaded before display** — LLM business justification calls run in parallel and complete before tickets appear. No blank fields.
 - Linear issues are created on the **CUSTDS** team via GraphQL API with triage state.
 
@@ -53,9 +55,14 @@ The G2 fetch proxy wraps Linear's GraphQL response as `{ success, data, statusCo
 - **Jira input** accepts either a key (e.g., `COA-719`) or a full URL (e.g., `https://block.atlassian.net/browse/COA-719`) — the key is extracted automatically.
 - **Linear input** accepts either an issue identifier (`CUSTDS-41`), an issue URL, or a **project URL** (e.g., `https://linear.app/squareup/project/cash-app-project-phone-plan-launch-2422862cf293/overview`).
 - Project URLs are auto-detected and tagged with a "Project" badge.
-- Pairs are persisted in browser localStorage under `ljs_linked_pairs`.
-- **Auto-populated from Tab 1** — when a user submits a new COA request on Tab 1, the resulting pair is appended to `ljs_linked_pairs` automatically (deduped) and a `ljs-pairs-changed` event causes this table to re-read localStorage and render the new row immediately.
-- Jira keys in the table are clickable hyperlinks to the Jira ticket.
+- **Shared across users** — pairs live in the D1 `linked_pairs` table behind `/api/linked-pairs` (GET/POST/DELETE). Everyone who uses the app sees and edits the same list; there is no per-user isolation. Uniqueness is enforced on `(jira_key, linear_identifier)` so re-submitting the same pair is idempotent.
+- **One-time localStorage migration** — on first load, SyncUpdates checks for a legacy `ljs_linked_pairs` localStorage entry and, if present, POSTs each pair to `/api/linked-pairs` before clearing the key. This carries forward what each user had stored locally before the switch to D1.
+- **Auto-populated from Tab 1** — when a user submits a new COA request on Tab 1, the resulting pair is POSTed to `/api/linked-pairs` automatically (the server upsert dedupes) and a `ljs-pairs-changed` event causes this table to re-fetch from the API and render the new row immediately.
+- **Column layout** (left → right):
+  1. **Jira Title** — leftmost, styled with `bg-background-secondary` + `font-semibold` + a right border so it reads as the row's identifier spanning the Jira Key and Linear Issue columns. Titles are fetched via `GET /rest/api/3/issue/{key}?fields=summary` for any key not already present (DB mappings seed the cache first), and cached in localStorage under `ljs_jira_titles` to avoid refetching on each load.
+  2. **COA Jira Key** — center-aligned; clickable hyperlink to the Jira ticket.
+  3. **Linear Issue (ID or URL)** — clickable hyperlink to the Linear issue or project (URL built from `isProject`). Project rows also keep the small "Project" badge.
+  4. Remove action.
 
 ### Project vs Issue Handling
 - **Project URL entered** — fetches all project-level updates AND all issues within the project (statuses + comments). The project is found using `searchProjects` (see Jira API Configuration section for details on why pagination doesn't work).
@@ -156,6 +163,7 @@ The G2 fetch proxy wraps Linear's GraphQL response as `{ success, data, statusCo
 ### Database (D1)
 - **ticket_mappings** — stores Jira key ↔ Linear issue ID/URL mapping, with status tracking.
 - **activity_log** — records who did what, when (America/Los_Angeles timezone), and the details.
+- **linked_pairs** — shared Jira/Linear pair list backing the Sync Updates tab. Columns: `id`, `jira_key`, `linear_id`, `linear_identifier`, `is_project`, `created_at`. Unique index on `(jira_key, linear_identifier)`. Migration `0002_linked_pairs.sql`. Exposed via `GET /api/linked-pairs`, `POST /api/linked-pairs` (upsert), `DELETE /api/linked-pairs/:id`.
 
 ### Auth
 - Default to the logged-in user's G2 Jira and Linear connections. Jira email override is configurable inline on the "Grab new COA Jira requests" tab (stored in localStorage).
