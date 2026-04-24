@@ -1,3 +1,15 @@
+# Push local changes to GitHub
+
+Run from `/Users/ssantor/claude/projects/linear-jira-sync`:
+
+```bash
+git add .
+git commit -m "what you changed"
+git push
+```
+
+---
+
 # Linear-Jira Sync — Plan
 
 ## Overview
