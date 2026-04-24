@@ -131,6 +131,44 @@ app.post('/api/activity', async (c) => {
 })
 
 // =============================================================================
+// API Routes — Linked Pairs (shared Jira/Linear pair list)
+// =============================================================================
+
+app.get('/api/linked-pairs', async (c) => {
+  const pairs = await db.query(
+    'SELECT id, jira_key, linear_id, linear_identifier, is_project, created_at FROM linked_pairs ORDER BY created_at ASC'
+  )
+  return c.json({ pairs })
+})
+
+app.post('/api/linked-pairs', async (c) => {
+  const body = await c.req.json()
+  const { jira_key, linear_id, linear_identifier, is_project } = body
+  if (!jira_key || !linear_identifier) {
+    return c.json({ error: 'jira_key and linear_identifier are required' }, 400)
+  }
+  await db.execute(
+    `INSERT INTO linked_pairs (jira_key, linear_id, linear_identifier, is_project)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(jira_key, linear_identifier) DO UPDATE SET
+       linear_id = excluded.linear_id,
+       is_project = excluded.is_project`,
+    [jira_key, linear_id || null, linear_identifier, is_project ? 1 : 0]
+  )
+  const row = await db.first<{ id: number }>(
+    'SELECT id FROM linked_pairs WHERE jira_key = ? AND linear_identifier = ?',
+    [jira_key, linear_identifier]
+  )
+  return c.json({ id: row?.id }, 201)
+})
+
+app.delete('/api/linked-pairs/:id', async (c) => {
+  const id = c.req.param('id')
+  await db.execute('DELETE FROM linked_pairs WHERE id = ?', [id])
+  return c.json({ success: true })
+})
+
+// =============================================================================
 // Static Files (MUST BE LAST)
 // =============================================================================
 

@@ -7,10 +7,19 @@ import { addActivityEntry } from '../../lib/activityLog'
 import type { TicketMapping } from '../../App'
 
 interface LinkedPair {
+  id?: number
   jiraKey: string
   linearId: string
   linearIdentifier: string
   isProject: boolean
+}
+
+interface LinkedPairRow {
+  id: number
+  jira_key: string
+  linear_id: string | null
+  linear_identifier: string
+  is_project: number
 }
 
 interface LinearUpdate {
@@ -41,19 +50,48 @@ interface Props {
   onMappingsChange: () => void
 }
 
-const SAVED_PAIRS_KEY = 'ljs_linked_pairs'
+const LEGACY_PAIRS_KEY = 'ljs_linked_pairs'
+const JIRA_TITLES_KEY = 'ljs_jira_titles'
 
-function loadSavedPairs(): LinkedPair[] {
-  try {
-    const stored = localStorage.getItem(SAVED_PAIRS_KEY)
-    return stored ? JSON.parse(stored) : []
-  } catch {
-    return []
+function rowToPair(row: LinkedPairRow): LinkedPair {
+  return {
+    id: row.id,
+    jiraKey: row.jira_key,
+    linearId: row.linear_id || '',
+    linearIdentifier: row.linear_identifier,
+    isProject: !!row.is_project,
   }
 }
 
-function savePairs(pairs: LinkedPair[]) {
-  localStorage.setItem(SAVED_PAIRS_KEY, JSON.stringify(pairs))
+async function fetchAllPairs(): Promise<LinkedPair[]> {
+  const res = await fetch('/api/linked-pairs')
+  if (!res.ok) throw new Error(`Failed to load linked pairs: ${res.status}`)
+  const { pairs } = (await res.json()) as { pairs: LinkedPairRow[] }
+  return (pairs || []).map(rowToPair)
+}
+
+function loadCachedTitles(): Record<string, string> {
+  try {
+    const stored = localStorage.getItem(JIRA_TITLES_KEY)
+    return stored ? JSON.parse(stored) : {}
+  } catch {
+    return {}
+  }
+}
+
+async function fetchJiraTitle(jiraKey: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://api.atlassian.com/ex/jira/31e7a210-9ba8-468d-a1d1-a806c34e5961/rest/api/3/issue/${jiraKey}?fields=summary`,
+      { headers: { 'X-G2-Extension': 'jira' } }
+    )
+    if (!res.ok) return null
+    const raw = await res.json()
+    const data = raw?.data ?? raw
+    return data?.fields?.summary || null
+  } catch {
+    return null
+  }
 }
 
 // Parse Linear input — detects issue URLs, project URLs, or raw identifiers
@@ -82,13 +120,98 @@ function parseLinearInput(input: string): { id: string; identifier: string; isPr
 }
 
 export function SyncUpdates({ mappings, onMappingsChange }: Props) {
-  const [pairs, setPairs] = useState<LinkedPair[]>(loadSavedPairs)
+  const [pairs, setPairs] = useState<LinkedPair[]>([])
+  const [jiraTitles, setJiraTitles] = useState<Record<string, string>>(loadCachedTitles)
+
+  const reloadPairs = async () => {
+    try {
+      setPairs(await fetchAllPairs())
+    } catch (err) {
+      console.warn('[LJS] Failed to load linked pairs:', err)
+    }
+  }
+
+  // Initial load: migrate any legacy localStorage pairs into the DB, then fetch.
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const legacy = localStorage.getItem(LEGACY_PAIRS_KEY)
+        if (legacy) {
+          const parsed: LinkedPair[] = JSON.parse(legacy)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            await Promise.all(
+              parsed.map((p) =>
+                fetch('/api/linked-pairs', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    jira_key: p.jiraKey,
+                    linear_id: p.linearId || null,
+                    linear_identifier: p.linearIdentifier,
+                    is_project: !!p.isProject,
+                  }),
+                })
+              )
+            )
+          }
+          localStorage.removeItem(LEGACY_PAIRS_KEY)
+        }
+      } catch (err) {
+        console.warn('[LJS] Legacy pair migration failed:', err)
+      }
+      await reloadPairs()
+    })()
+  }, [])
 
   useEffect(() => {
-    const reload = () => setPairs(loadSavedPairs())
+    const reload = () => { reloadPairs() }
     window.addEventListener('ljs-pairs-changed', reload)
     return () => window.removeEventListener('ljs-pairs-changed', reload)
   }, [])
+
+  // Seed titles from mappings (DB-backed) when available, then fetch any still missing
+  useEffect(() => {
+    const mappingTitles: Record<string, string> = {}
+    for (const m of mappings) {
+      if (m.jira_key && m.jira_summary && !jiraTitles[m.jira_key]) {
+        mappingTitles[m.jira_key] = m.jira_summary
+      }
+    }
+    if (Object.keys(mappingTitles).length > 0) {
+      setJiraTitles((prev) => {
+        const next = { ...prev, ...mappingTitles }
+        localStorage.setItem(JIRA_TITLES_KEY, JSON.stringify(next))
+        return next
+      })
+    }
+  }, [mappings])
+
+  useEffect(() => {
+    const missing = Array.from(new Set(pairs.map((p) => p.jiraKey))).filter(
+      (key) => key && !jiraTitles[key]
+    )
+    if (missing.length === 0) return
+
+    let cancelled = false
+    ;(async () => {
+      const results = await Promise.all(
+        missing.map(async (key) => [key, await fetchJiraTitle(key)] as const)
+      )
+      if (cancelled) return
+      setJiraTitles((prev) => {
+        const next = { ...prev }
+        for (const [key, title] of results) {
+          if (title) next[key] = title
+        }
+        localStorage.setItem(JIRA_TITLES_KEY, JSON.stringify(next))
+        return next
+      })
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [pairs])
 
   const [newJiraKey, setNewJiraKey] = useState('')
   const [newLinearInput, setNewLinearInput] = useState('')
@@ -99,7 +222,7 @@ export function SyncUpdates({ mappings, onMappingsChange }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
-  const addPair = () => {
+  const addPair = async () => {
     let jira = newJiraKey.trim()
     // Extract key from full Jira URL like https://block.atlassian.net/browse/COA-719
     const jiraUrlMatch = jira.match(/atlassian\.net\/browse\/([A-Z]+-\d+)/i)
@@ -112,17 +235,38 @@ export function SyncUpdates({ mappings, onMappingsChange }: Props) {
     const parsed = parseLinearInput(newLinearInput)
     if (!parsed) return
 
-    const updated = [...pairs, { jiraKey: jira, linearId: parsed.id, linearIdentifier: parsed.identifier, isProject: parsed.isProject }]
-    setPairs(updated)
-    savePairs(updated)
-    setNewJiraKey('')
-    setNewLinearInput('')
+    try {
+      const res = await fetch('/api/linked-pairs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jira_key: jira,
+          linear_id: parsed.id || null,
+          linear_identifier: parsed.identifier,
+          is_project: parsed.isProject,
+        }),
+      })
+      if (!res.ok) throw new Error(`POST /api/linked-pairs failed: ${res.status}`)
+      setNewJiraKey('')
+      setNewLinearInput('')
+      await reloadPairs()
+      window.dispatchEvent(new CustomEvent('ljs-pairs-changed'))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
   }
 
-  const removePair = (idx: number) => {
-    const updated = pairs.filter((_, i) => i !== idx)
-    setPairs(updated)
-    savePairs(updated)
+  const removePair = async (idx: number) => {
+    const pair = pairs[idx]
+    if (!pair?.id) return
+    try {
+      const res = await fetch(`/api/linked-pairs/${pair.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(`DELETE /api/linked-pairs failed: ${res.status}`)
+      await reloadPairs()
+      window.dispatchEvent(new CustomEvent('ljs-pairs-changed'))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
   }
 
   const fetchLinearUpdates = async () => {
@@ -664,14 +808,15 @@ Return ONLY the 4-5 sentence summary, nothing else.`)
         </CardHeader>
         <CardContent>
           <p className="text-text-secondary text-sm mb-4">
-            Add Jira / Linear pairs to sync. Pairs are saved in your browser.
+            Add Jira / Linear pairs to sync. Pairs are shared across all users of this app.
           </p>
 
           <div className="overflow-x-auto mb-4">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border-primary">
-                  <th className="text-left py-2 pr-4 text-text-secondary font-medium">COA Jira Key</th>
+                  <th className="text-left py-2 pr-4 text-text-secondary font-medium">Jira Title</th>
+                  <th className="text-center py-2 pr-4 text-text-secondary font-medium">COA Jira Key</th>
                   <th className="text-left py-2 pr-4 text-text-secondary font-medium">Linear Issue (ID or URL)</th>
                   <th className="text-left py-2 text-text-secondary font-medium w-16"></th>
                 </tr>
@@ -679,13 +824,27 @@ Return ONLY the 4-5 sentence summary, nothing else.`)
               <tbody>
                 {pairs.map((pair, i) => (
                   <tr key={i} className="border-b border-border-secondary last:border-0">
-                    <td className="py-2 pr-4 font-mono">
+                    <td className="py-2 pr-4 bg-background-secondary text-text-primary font-semibold border-r border-border-primary">
+                      {jiraTitles[pair.jiraKey] || <span className="text-text-secondary italic font-normal">Loading...</span>}
+                    </td>
+                    <td className="py-2 pr-4 font-mono text-center">
                       <a href={`https://block.atlassian.net/browse/${pair.jiraKey}`} target="_blank" rel="noopener noreferrer" className="text-text-info hover:underline">
                         {pair.jiraKey}
                       </a>
                     </td>
                     <td className="py-2 pr-4 font-mono">
-                      {pair.linearIdentifier}
+                      <a
+                        href={
+                          pair.isProject
+                            ? `https://linear.app/squareup/project/${pair.linearIdentifier}`
+                            : `https://linear.app/squareup/issue/${pair.linearIdentifier}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-text-info hover:underline"
+                      >
+                        {pair.linearIdentifier}
+                      </a>
                       {pair.isProject && (
                         <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-background-info text-text-info">Project</span>
                       )}
@@ -701,6 +860,7 @@ Return ONLY the 4-5 sentence summary, nothing else.`)
                   </tr>
                 ))}
                 <tr>
+                  <td className="py-2 pr-4"></td>
                   <td className="py-2 pr-4">
                     <Input
                       value={newJiraKey}

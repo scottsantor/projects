@@ -192,6 +192,7 @@ export function NewRequests({ mappings, onMappingsChange }: Props) {
   const [tickets, setTickets] = useState<FetchedTicket[]>([])
   const [hiddenCount, setHiddenCount] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [hasFetched, setHasFetched] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [jiraEmail, setJiraEmail] = useState(() => {
@@ -243,15 +244,15 @@ export function NewRequests({ mappings, onMappingsChange }: Props) {
       console.log('[LJS] Issues found:', jiraData?.issues?.length ?? 0)
 
       const existingKeys = new Set(mappings.map((m) => m.jira_key))
-      // Also exclude anything already tracked in the SyncUpdates pairs table (localStorage)
+      // Also exclude anything already tracked in the SyncUpdates linked-pairs table
       try {
-        const stored = localStorage.getItem('ljs_linked_pairs')
-        if (stored) {
-          const pairs: Array<{ jiraKey: string }> = JSON.parse(stored)
-          for (const p of pairs) existingKeys.add(p.jiraKey)
+        const res = await fetch('/api/linked-pairs')
+        if (res.ok) {
+          const { pairs } = (await res.json()) as { pairs: Array<{ jira_key: string }> }
+          for (const p of pairs || []) existingKeys.add(p.jira_key)
         }
       } catch {
-        // ignore malformed localStorage
+        // ignore network errors — dedup is best-effort
       }
       const fetched: FetchedTicket[] = []
 
@@ -375,7 +376,9 @@ Return ONLY the 2-3 sentence justification, nothing else.`)
     } catch (err) {
       console.error('[LJS] Jira fetch error:', err)
       setError(err instanceof Error ? err.message : String(err))
+    } finally {
       setLoading(false)
+      setHasFetched(true)
     }
   }
 
@@ -507,22 +510,20 @@ Return ONLY the 2-3 sentence justification, nothing else.`)
             : t
         )
       )
-      // Add to the SyncUpdates pairs list in localStorage so the new link
-      // shows up in the Sync-Linear-updates-to-Jira table without manual entry
+      // Add to the shared linked-pairs table so the new link
+      // shows up in the Sync-Linear-updates-to-Jira tab for everyone
       try {
-        const stored = localStorage.getItem('ljs_linked_pairs')
-        const existing: Array<{ jiraKey: string; linearId: string; linearIdentifier: string; isProject: boolean }> = stored ? JSON.parse(stored) : []
-        const dup = existing.some(
-          (p) => p.jiraKey === ticket.jira.key && p.linearIdentifier === linearIssue.identifier
-        )
-        if (!dup) {
-          const updated = [
-            ...existing,
-            { jiraKey: ticket.jira.key, linearId: linearIssue.id, linearIdentifier: linearIssue.identifier, isProject: false },
-          ]
-          localStorage.setItem('ljs_linked_pairs', JSON.stringify(updated))
-          window.dispatchEvent(new CustomEvent('ljs-pairs-changed'))
-        }
+        await fetch('/api/linked-pairs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jira_key: ticket.jira.key,
+            linear_id: linearIssue.id,
+            linear_identifier: linearIssue.identifier,
+            is_project: false,
+          }),
+        })
+        window.dispatchEvent(new CustomEvent('ljs-pairs-changed'))
       } catch {
         // non-fatal — submission already succeeded
       }
@@ -544,7 +545,7 @@ Return ONLY the 2-3 sentence justification, nothing else.`)
           <div className="flex items-center justify-between">
             <CardTitle>Jira to Linear -- New Requests</CardTitle>
             <Button onClick={fetchJiraTickets} disabled={loading}>
-              {loading ? 'Fetching...' : 'Grab New COA Requests'}
+              {loading ? 'Fetching...' : hasFetched ? 'Fetched' : 'Grab New COA Requests'}
             </Button>
           </div>
         </CardHeader>
@@ -583,7 +584,7 @@ Return ONLY the 2-3 sentence justification, nothing else.`)
           {tickets.length > 0 && (
             <>
               <p className="text-sm text-text-primary mb-4 font-medium">
-                {tickets.length} new ticket(s){hiddenCount > 0 && ` — ${hiddenCount} already linked and hidden`}
+                {tickets.length} new ticket(s){hiddenCount > 0 && ` - ${hiddenCount} already linked in 'Sync Linear updates to Jira' tab`}
               </p>
               <div className="space-y-3">
                 {tickets.map((ticket) => {
@@ -602,7 +603,9 @@ Return ONLY the 2-3 sentence justification, nothing else.`)
           )}
 
           {tickets.length === 0 && !loading && (
-            <p className="text-text-secondary text-sm">No tickets loaded yet.</p>
+            <p className="text-text-secondary text-sm">
+              No incremental COA Jira requests found that aren't already accounted for in the 'Sync Linear updates to Jira' tab.
+            </p>
           )}
         </CardContent>
       </Card>
