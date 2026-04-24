@@ -1,6 +1,18 @@
+# Push local changes to GitHub
+
+Run from `/Users/ssantor/claude/projects/ssantor-intern`:
+
+```bash
+git add .
+git commit -m "what you changed"
+git push
+```
+
+---
+
 # Claude Cost tab — execution plan
 
-Run from `/Users/ssantor/claude/ssantor-intern/ssantor-intern`.
+Run from `/Users/ssantor/claude/projects/ssantor-intern`.
 
 ## 1. Eyeball locally
 
