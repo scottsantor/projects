@@ -23,7 +23,7 @@ const SECTIONS: LinkSection[] = [
     links: [
       { name: 'ssantor-intern', url: 'https://g2.stage.sqprod.co/apps/ssantor-intern' },
       { name: 'linear-jira-sync-coa', url: 'https://g2.sqprod.co/apps/linear-jira-sync-coa' },
-      { name: 'portfolio-coverage', url: 'https://g2.sqprod.co/apps/portfolio-coverage' },   
+      { name: 'portfolio-coverage', url: 'https://g2.sqprod.co/apps/portfolio-coverage' },
     ],
   },
   {
