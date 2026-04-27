@@ -25,6 +25,7 @@ const SECTIONS: LinkSection[] = [
       { name: 'linear-jira-sync-coa', url: 'https://g2.sqprod.co/apps/linear-jira-sync-coa' },
       { name: 'portfolio-coverage', url: 'https://g2.sqprod.co/apps/portfolio-coverage' },
       { name: 'RADS Sprint Dashboard', url: 'https://blockcell.sqprod.co/sites/rads-sprint-dashboard/' },
+      { name: 'CS Business Reviews', url: 'https://blockcell.sqprod.co/sites/cs-business-reviews/' },
     ],
   },
   {
