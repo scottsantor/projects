@@ -252,10 +252,11 @@ Layout: `grid-cols-1 md:grid-cols-2` — two-up on wider screens, single column 
 
 ### If you add a new tab later
 
-Three places to touch:
+Two places to touch:
 1. `App.tsx` — add `<TabsTrigger>` + `<TabsContent>`.
 2. `Home.tsx` — add a tile to the `TILES` array (`id` must match the `TabsTrigger value`).
-3. The header subtitle ("tickets, todos, meeting notes, costs, and quick links") — only if the new tab is significant enough to advertise up there.
+
+(The header subtitle was removed in version 29, so there's no longer a third place that lists tabs by name.)
 
 ## Deploy note: `appkit` CLI vs. block-app-kit MCP
 
@@ -270,3 +271,44 @@ mcp__block-app-kit__deploy_site(
 ```
 
 Both paths produce the same artifact (a versioned site upload). Use whichever is available — CLI is faster from a terminal, MCP works from inside a Claude Code session without the binary installed.
+
+## Scratch tab — open localStorage-backed pad
+
+Done 2026-04-27 (versions 25–26). New tab whose entire purpose is "type stuff, paste stuff, copy stuff back out." No backend, no LLM, no API calls.
+
+### Files
+
+- `src/components/features/Scratch.tsx` — new. One textarea (`min-h-[60vh]`, monospace), Copy-all and Clear buttons in the header, char count next to them. Persists to `localStorage` under the key `ssantor-intern:scratch` on every keystroke; reads the same key on mount so content survives tab switches and reloads.
+- `src/App.tsx` — added trigger, content, and import.
+- `src/components/features/Home.tsx` — added a `Pencil`-icon tile.
+
+### Tab order — Scratch sits at the far right
+
+Scott's preference: utility/free-form tabs go to the right, scoped/structured tabs stay on the left. Final order (versions 26+):
+
+`Home · Create Ticket · To-Do · Meeting Notes · Polish Writeup · Claude Cost · Links · Scratch`
+
+The Home tile grid mirrors the same order. If you reorder the tabs, reorder `TILES` in `Home.tsx` to match — the two should never disagree.
+
+### app.yaml
+
+No changes. localStorage is browser-side, no extensions or scopes needed.
+
+## Links — RADS Sprint Dashboard added to Block Web Apps
+
+Done 2026-04-27 (versions 27–28). Added `https://blockcell.sqprod.co/sites/rads-sprint-dashboard/` to the **Block Web Apps** section in `src/components/features/Links.tsx` (originally placed under "Verified Dashboard Links" in v27, then moved on Scott's request).
+
+Convention to follow when adding more links: Blockcell-hosted apps and g2-hosted apps both go under **Block Web Apps**. **Verified Dashboard Links** is reserved for Mode and Looker dashboards specifically.
+
+## Header subtitle removed
+
+Done 2026-04-27 (version 29). The header subtitle ("One-stop shop for Scott to stay on top of his work — tickets, todos, meeting notes, costs, and quick links, all in one place.") was deleted from `src/App.tsx`. The header is now just the H1 ("Scott's Intern") with no subtitle. Side effect: the "If you add a new tab later" checklist above lost its third item.
+
+## My Work → To-Do rename
+
+Done 2026-04-27 (version 30). The tab previously labeled **My Work** is now **To-Do**.
+
+- `App.tsx` — `<TabsTrigger value="mine">To-Do</TabsTrigger>` (the `value` stayed as `"mine"`; only the visible label changed, so no other wiring breaks).
+- `Home.tsx` — tile `title` → `'To-Do'`, prompt → `'Do I want to look at my to-dos?'`. Tile `id` and `blurb` unchanged.
+
+The underlying component still composes `<MyTickets />` (Linear tickets assigned to me) + `<Todos />` (D1-backed todos), so the label is the only thing that moved.
