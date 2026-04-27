@@ -31,6 +31,7 @@ const SECTIONS: LinkSection[] = [
     links: [
       { name: 'Speed to Answer Mode dash', url: 'https://app.mode.com/cashapp/reports/98e89d6bc3cd' },
       { name: 'Support Prod Metrics Dash', url: `https://${LOOKER_HOST}/dashboards/39691` },
+      { name: 'RADS Sprint Dashboard', url: 'https://blockcell.sqprod.co/sites/rads-sprint-dashboard/' },
     ],
   },
 ]
