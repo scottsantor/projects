@@ -24,8 +24,8 @@ const TILES: Tile[] = [
   {
     id: 'mine',
     icon: ListTodo,
-    title: 'My Work',
-    prompt: 'Do I want to look at my work?',
+    title: 'To-Do',
+    prompt: 'Do I want to look at my to-dos?',
     blurb: 'Linear tickets assigned to me, plus my todos.',
   },
   {

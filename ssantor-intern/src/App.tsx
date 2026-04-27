@@ -24,7 +24,7 @@ function App() {
           <TabsList>
             <TabsTrigger value="home">Home</TabsTrigger>
             <TabsTrigger value="create">Create Ticket</TabsTrigger>
-            <TabsTrigger value="mine">My Work</TabsTrigger>
+            <TabsTrigger value="mine">To-Do</TabsTrigger>
             <TabsTrigger value="notepad">Meeting Notes</TabsTrigger>
             <TabsTrigger value="polish">Polish Writeup</TabsTrigger>
             <TabsTrigger value="cost">Claude Cost</TabsTrigger>
