@@ -43,13 +43,6 @@ const TILES: Tile[] = [
     blurb: 'Rewrite a draft in my voice — tight, forward-looking, clean.',
   },
   {
-    id: 'scratch',
-    icon: Pencil,
-    title: 'Scratch',
-    prompt: 'Do I want a scratch pad?',
-    blurb: 'Open pad for typing, pasting, and copying back out.',
-  },
-  {
     id: 'cost',
     icon: DollarSign,
     title: 'Claude Cost',
@@ -62,6 +55,13 @@ const TILES: Tile[] = [
     title: 'Links',
     prompt: 'Do I want my quick links?',
     blurb: 'Jump to dashboards, docs, and go/ links.',
+  },
+  {
+    id: 'scratch',
+    icon: Pencil,
+    title: 'Scratch',
+    prompt: 'Do I want a scratch pad?',
+    blurb: 'Open pad for typing, pasting, and copying back out.',
   },
 ]
 

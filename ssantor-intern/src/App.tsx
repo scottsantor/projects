@@ -30,9 +30,9 @@ function App() {
             <TabsTrigger value="mine">My Work</TabsTrigger>
             <TabsTrigger value="notepad">Meeting Notes</TabsTrigger>
             <TabsTrigger value="polish">Polish Writeup</TabsTrigger>
-            <TabsTrigger value="scratch">Scratch</TabsTrigger>
             <TabsTrigger value="cost">Claude Cost</TabsTrigger>
             <TabsTrigger value="links">Links</TabsTrigger>
+            <TabsTrigger value="scratch">Scratch</TabsTrigger>
           </TabsList>
 
           <TabsContent value="home" forceMount className="data-[state=inactive]:hidden">
@@ -59,16 +59,16 @@ function App() {
             <PolishWriteup />
           </TabsContent>
 
-          <TabsContent value="scratch" forceMount className="data-[state=inactive]:hidden">
-            <Scratch />
-          </TabsContent>
-
           <TabsContent value="cost" forceMount className="data-[state=inactive]:hidden">
             <ClaudeCost />
           </TabsContent>
 
           <TabsContent value="links" forceMount className="data-[state=inactive]:hidden">
             <Links />
+          </TabsContent>
+
+          <TabsContent value="scratch" forceMount className="data-[state=inactive]:hidden">
+            <Scratch />
           </TabsContent>
         </Tabs>
       </div>
