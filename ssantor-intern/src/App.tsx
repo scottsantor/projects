@@ -18,9 +18,6 @@ function App() {
       <div className="mx-auto max-w-5xl px-6 py-8">
         <header className="mb-6">
           <h1 className="text-3xl font-semibold tracking-tight">Scott's Intern</h1>
-          <p className="text-sm text-text-secondary mt-1">
-            One-stop shop for Scott to stay on top of his work — tickets, todos, meeting notes, costs, and quick links, all in one place.
-          </p>
         </header>
 
         <Tabs value={tab} onValueChange={setTab} className="w-full">
