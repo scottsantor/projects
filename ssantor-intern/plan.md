@@ -173,3 +173,100 @@ Three protocols were attempted and all failed. Skip these dead ends:
 3. **`cloudflare-action` postMessage** mirroring `apps/meeting-context-prepper` and `apps/integrations-testing` in g2-apps byte-for-byte — silent timeout, G2 never replied. Tried both with `extensions:` block and matching integrations-testing's manifest exactly (`connections` + `scopes` + `resources: {}` + `approval: auto`, no `extensions`). Either way, no response.
 
 The transport code matched a working diagnostic app verbatim. Best guess: block-app-kit-deployed apps register with kgoose differently than g2-apps-repo apps, and `ssantor-intern` isn't authorized for the `google_calendar` MCP route on the kgoose side. Right next step if you want calendar back: file with the block-app-kit team referencing this transcript.
+
+## Meeting Notes tab — reframed as a persistent running log
+
+Done 2026-04-24 (versions 21–22). The tab was originally framed as a single-day notepad: a date input filtered the view to one day, and the heading read "Today · Fri Apr 24 · N meetings". After a few days of use it became confusing — past notes were still in D1, but invisible unless you remembered to switch the date picker.
+
+Reframed in `src/components/features/Notepad.tsx`:
+
+- Tab label: **Notepad → Meeting Notes** (in `App.tsx`).
+- Heading: "Meeting Notes" with subtitle "N meetings — your running log of notes, kept across days".
+- `GET /api/meetings` is now called without a `date=` query param, returning **all** meetings across all dates. Server already supported this — `server/index.ts:193–206` returns the unfiltered set ordered by `meeting_date DESC, start_time ASC, id ASC` when `date` is absent.
+- Add-meeting form still has a date input, but it's now scoped to *the new meeting being created* (not a view filter). Defaults to today, resets to today after each submit.
+- Client-side `sortMeetings` updated to sort by `meeting_date` DESC first, then `start_time` ASC, then `id` — newest day at the top of the list.
+- Removed the now-unused `formatDateLabel` and `addDaysISO` helpers.
+
+Each card still prefixes the title with `formatShortDate(meeting_date)` (e.g. `Fri Apr 24 – Standup`), so days are visually distinguishable in the merged list.
+
+No DB migration needed — the same `meetings` table backs both views; only the read query changed.
+
+## Header subtitle reframe
+
+Done 2026-04-24 (version 22). The header subtitle in `src/App.tsx` was "Linear cockpit — create CUSTDS tickets and track what's assigned to you", which was accurate for v1 but undersold the app once Notepad/Polish/Cost/Links were added. Replaced with: "One-stop shop for Scott to stay on top of his work — tickets, todos, meeting notes, costs, and quick links, all in one place."
+
+Tradeoff: the subtitle now lists tabs by name. If the tab list changes meaningfully, update the subtitle too.
+
+## Polish Writeup tab — voice-matched LLM rewrite
+
+Done 2026-04-24 (version 23). New tab that takes a draft and rewrites it in Scott's voice using the G2 LLM bridge.
+
+### Files
+
+- `src/hooks/useLlm.ts` — new. Implements the `cloudflare-llm-request` postMessage pattern from CLAUDE.md verbatim. 5-minute timeout, request map keyed by `crypto.randomUUID()`, single global `message` listener installed at module load. No changes needed beyond the template.
+- `src/components/features/PolishWriteup.tsx` — new. Draft textarea (auto-grow, min height 160px) → **Polish** button → polished output card with **Copy** button. Uses `useLlm.complete(draft, { systemPrompt: SYSTEM_PROMPT })`.
+- `src/App.tsx` — added tab trigger, content, and import.
+
+### Voice profile (the critical part)
+
+The system prompt encodes Scott's voice. It was distilled at build time from a 30-day Slack search (`sq agent-tools slack search-messages --from-user me --newer-than P30D --limit 100`), not fetched at runtime — keeps the polish call fast and keeps Slack content out of the deployed app.
+
+Key voice rules baked into `SYSTEM_PROMPT`:
+- Warm collaborative openers ("Hey", "FYI", "Heads up"), contractions throughout.
+- Action-oriented and forward-looking — compresses past-failure context to one sentence and pivots forward. Explicit instruction: **"if the draft retreads a failed attempt, compress it to one sentence of context and pivot to the forward path."**
+- Empathetic acknowledgement before redirecting ("I hear you", "I get where you're coming from").
+- Humble hedging ("I think", "my understanding is", "IMO") instead of false certainty.
+- **Preserves specifics** — names, numbers, dates, ticket links, queue/table names. Explicitly forbidden to strip these during rewrite.
+- Bulleted summaries with TLDRs when long; light sign-offs when fitting.
+- Avoids: apologetic filler, corporate stiffness, blame, hype, emoji unless the draft already uses one.
+- Output format: returns ONLY the polished text — no preamble, no markdown fences, no "Here's the polished version:" lead-in.
+
+A condensed version of the voice profile was also saved to user memory at `user_writing_voice.md` so future Claude conversations can ghostwrite for Scott without rescanning Slack. The app's `SYSTEM_PROMPT` is the canonical/full version — update it there first, then sync the memory if substantive.
+
+### app.yaml
+
+No changes. The G2 LLM bridge is implicit; no kgoose extensions are invoked unless `options.extensions` is passed to `complete()` (it isn't, by default).
+
+## Home tab — default landing with click-to-navigate tiles
+
+Done 2026-04-24 (version 24). New default tab that asks "What do you want to do?" and shows six clickable cards, one per other tab. Click a card → that tab activates.
+
+### How navigation works
+
+Tabs were converted from uncontrolled to controlled in `src/App.tsx`:
+
+```tsx
+const [tab, setTab] = useState('home')
+<Tabs value={tab} onValueChange={setTab} ...>
+```
+
+`<Home onNavigate={setTab} />` receives `setTab` as a prop. Each tile in `Home.tsx` calls `onNavigate(tile.id)` on click — no router, no events, no context.
+
+The header tabs and the Home tiles share the same `setTab` so both work; `forceMount` on every `TabsContent` (already in place from earlier work) means switching tabs doesn't unmount and remount components — important for the Notepad's expanded/edit state and the Polish Writeup's polished output to survive tab switches.
+
+### Tile copy
+
+Each tile shows a question prompt ("Do I want to create a ticket?") matching the way Scott described the design, plus a one-line blurb about what the tab does. Lucide icons: `Ticket`, `ListTodo`, `NotebookPen`, `Sparkles`, `DollarSign`, `Link`. Hover states use semantic tokens (`hover:border-border-secondary hover:shadow-md`) so light/dark themes adapt.
+
+Layout: `grid-cols-1 md:grid-cols-2` — two-up on wider screens, single column on mobile.
+
+### If you add a new tab later
+
+Three places to touch:
+1. `App.tsx` — add `<TabsTrigger>` + `<TabsContent>`.
+2. `Home.tsx` — add a tile to the `TILES` array (`id` must match the `TabsTrigger value`).
+3. The header subtitle ("tickets, todos, meeting notes, costs, and quick links") — only if the new tab is significant enough to advertise up there.
+
+## Deploy note: `appkit` CLI vs. block-app-kit MCP
+
+`appkit deploy ssantor-intern ./build` (per CLAUDE.md) requires the `appkit` CLI on PATH. On 2026-04-24 the CLI wasn't installed in the active shell, and deploys were done via the **block-app-kit MCP `deploy_site` tool** instead:
+
+```
+mcp__block-app-kit__deploy_site(
+  site_name="ssantor-intern",
+  build_path="/Users/ssantor/claude/projects/ssantor-intern/build",
+  message="..."
+)
+```
+
+Both paths produce the same artifact (a versioned site upload). Use whichever is available — CLI is faster from a terminal, MCP works from inside a Claude Code session without the binary installed.

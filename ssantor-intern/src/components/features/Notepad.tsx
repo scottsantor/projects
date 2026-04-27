@@ -55,16 +55,6 @@ function todayISO(): string {
   return `${y}-${m}-${day}`
 }
 
-function addDaysISO(iso: string, days: number): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  const date = new Date(y, (m ?? 1) - 1, d ?? 1)
-  date.setDate(date.getDate() + days)
-  const yy = date.getFullYear()
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  const dd = String(date.getDate()).padStart(2, '0')
-  return `${yy}-${mm}-${dd}`
-}
-
 function formatShortDate(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
   const date = new Date(y, (m ?? 1) - 1, d ?? 1)
@@ -73,30 +63,13 @@ function formatShortDate(iso: string): string {
     .replace(/,/g, '')
 }
 
-function formatDateLabel(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  const date = new Date(y, (m ?? 1) - 1, d ?? 1)
-  const today = todayISO()
-  const tomorrow = addDaysISO(today, 1)
-  const yesterday = addDaysISO(today, -1)
-  const base = date.toLocaleDateString(undefined, {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-  })
-  if (iso === today) return `Today · ${base}`
-  if (iso === tomorrow) return `Tomorrow · ${base}`
-  if (iso === yesterday) return `Yesterday · ${base}`
-  return base
-}
-
 export function Notepad() {
-  const [date, setDate] = useState<string>(todayISO())
   const [meetings, setMeetings] = useState<Meeting[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const [newTitle, setNewTitle] = useState('')
+  const [newDate, setNewDate] = useState<string>(todayISO())
   const [submitting, setSubmitting] = useState(false)
 
   const [savingId, setSavingId] = useState<number | null>(null)
@@ -147,13 +120,11 @@ export function Notepad() {
     })
   }
 
-  const load = useCallback(async (d: string) => {
+  const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const data = await api<{ meetings: Meeting[] }>(
-        `/api/meetings?date=${encodeURIComponent(d)}`
-      )
+      const data = await api<{ meetings: Meeting[] }>('/api/meetings')
       setMeetings(data.meetings)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -163,8 +134,8 @@ export function Notepad() {
   }, [])
 
   useEffect(() => {
-    load(date)
-  }, [date, load])
+    load()
+  }, [load])
 
   const addMeeting = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -175,7 +146,7 @@ export function Notepad() {
     try {
       const { meeting } = await api<{ meeting: Meeting }>('/api/meetings', {
         method: 'POST',
-        body: JSON.stringify({ title, meeting_date: date }),
+        body: JSON.stringify({ title, meeting_date: newDate }),
       })
       setMeetings((prev) => (prev ? [...prev, meeting].sort(sortMeetings) : [meeting]))
       setExpandedIds((prev) => {
@@ -184,6 +155,7 @@ export function Notepad() {
         return next
       })
       setNewTitle('')
+      setNewDate(todayISO())
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -206,7 +178,7 @@ export function Notepad() {
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
-      load(date)
+      load()
     } finally {
       setSavingId(null)
     }
@@ -218,7 +190,7 @@ export function Notepad() {
       await api(`/api/meetings/${id}`, { method: 'DELETE' })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
-      load(date)
+      load()
     }
   }
 
@@ -227,9 +199,11 @@ export function Notepad() {
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold">Notepad</h2>
+        <h2 className="text-lg font-semibold">Meeting Notes</h2>
         <p className="text-sm text-text-secondary">
-          {loading ? 'Loading…' : `${formatDateLabel(date)} · ${count} meeting${count === 1 ? '' : 's'}`}
+          {loading
+            ? 'Loading…'
+            : `${count} meeting${count === 1 ? '' : 's'} — your running log of notes, kept across days`}
         </p>
       </div>
 
@@ -251,8 +225,8 @@ export function Notepad() {
             />
             <Input
               type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
+              value={newDate}
+              onChange={(e) => setNewDate(e.target.value)}
               className="md:w-[150px]"
               aria-label="Meeting date"
             />
@@ -275,7 +249,7 @@ export function Notepad() {
       {meetings && meetings.length === 0 && !loading && (
         <Card>
           <CardContent className="py-8 text-center text-sm text-text-secondary">
-            No meetings for this day. Add one above.
+            No meeting notes yet. Add one above.
           </CardContent>
         </Card>
       )}
@@ -394,6 +368,9 @@ export function Notepad() {
 }
 
 function sortMeetings(a: Meeting, b: Meeting): number {
+  if (a.meeting_date !== b.meeting_date) {
+    return a.meeting_date < b.meeting_date ? 1 : -1
+  }
   const at = a.start_time ?? '99:99'
   const bt = b.start_time ?? '99:99'
   if (at !== bt) return at < bt ? -1 : 1
